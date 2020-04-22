@@ -114,6 +114,9 @@ timer_sleep (int64_t ticks)
   printf("Thread '%s' inserted into sleep list\n", current_thread->name);
 
   thread_block ();
+  /* Thread_block returns when the sleep time ends 
+   * -> interrupts turned back on */
+  intr_enable ();
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
