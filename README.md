@@ -1,2 +1,2 @@
 # cs140
-CS140 Spring 2020
+Repo for Spring 2020 offering of CS140 
