@@ -20,6 +20,9 @@
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
+/* List containing sleeping threads */
+static struct list sleep_list;
+
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
@@ -37,6 +40,7 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+  list_init(&sleep_list);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -89,11 +93,27 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-  int64_t start = timer_ticks ();
+  int64_t end = timer_ticks () + ticks;
+  struct thread *current_thread = thread_current ();
+  current_thread->sleep_until = end;
+  
+  /* Disables interrupts (required for thread_block call) */ 
+  intr_disable ();
 
-  ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  /* Comparison function for list insert */
+  bool list_less (const struct list_elem *a,
+                    const struct list_elem *b,
+                    void *aux) {
+    (void) aux;
+    struct thread *a_entry = list_entry (a, struct thread, sleep_elem);
+    struct thread *b_entry = list_entry (b, struct thread, sleep_elem);
+    return a_entry->sleep_until < b_entry->sleep_until;
+  }
+
+  list_insert_ordered (&sleep_list, &(current_thread->sleep_elem), list_less, NULL );
+  printf("Thread '%s' inserted into sleep list\n", current_thread->name);
+
+  thread_block ();
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -171,6 +191,18 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
+
+  /* Unblocks all threads whose sleep time has ended */
+  while (!list_empty (&sleep_list) 
+          && (list_entry (
+                list_front (&sleep_list), struct thread, sleep_elem
+              ) -> sleep_until < timer_ticks ())) {
+    struct list_elem *head = list_pop_front (&sleep_list);
+    struct thread *next_thread = list_entry (head, struct thread, sleep_elem);
+    thread_unblock (next_thread);
+    printf ("Thread '%s' removed from sleep list\n", next_thread->name);
+  }
+  
   thread_tick ();
 }
 
