@@ -111,7 +111,6 @@ timer_sleep (int64_t ticks)
   }
 
   list_insert_ordered (&sleep_list, &(current_thread->sleep_elem), list_less, NULL );
-  printf("Thread '%s' inserted into sleep list\n", current_thread->name);
 
   thread_block ();
   /* Thread_block returns when the sleep time ends 
@@ -199,11 +198,10 @@ timer_interrupt (struct intr_frame *args UNUSED)
   while (!list_empty (&sleep_list) 
           && (list_entry (
                 list_front (&sleep_list), struct thread, sleep_elem
-              ) -> sleep_until < timer_ticks ())) {
+              ) -> sleep_until <= timer_ticks ())) {
     struct list_elem *head = list_pop_front (&sleep_list);
     struct thread *next_thread = list_entry (head, struct thread, sleep_elem);
     thread_unblock (next_thread);
-    printf ("Thread '%s' removed from sleep list\n", next_thread->name);
   }
   
   thread_tick ();
