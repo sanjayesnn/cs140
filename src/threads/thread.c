@@ -210,6 +210,9 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
+  
+  if (thread_current()->priority < t->priority)
+      thread_yield ();
 
   return tid;
 }
@@ -251,12 +254,6 @@ thread_unblock (struct thread *t)
   list_insert_ordered (&ready_list, &t->elem, thread_priority_compare, NULL);
 
   t->status = THREAD_READY;
-  
-  if (intr_context ()) {
-    intr_yield_on_return();
-  } else if ((thread_current () != idle_thread)) {
-    thread_yield ();
-  }
 
   intr_set_level (old_level);
 }
@@ -358,12 +355,23 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
-  if ( intr_context()) {
-    intr_yield_on_return();
-  } else if (thread_current () != idle_thread) {
-    thread_yield ();
+  /* Avoid race condition with modifying thread struct */
+  enum intr_level old_level = intr_disable ();
+  struct thread *cur_thread = thread_current ();
+  
+  bool should_yield = false;
+  cur_thread->priority = new_priority;
+
+  if (!list_empty (&ready_list)) {
+    struct thread *max_thread = list_entry (list_min (&ready_list,
+					                                  thread_priority_compare, NULL),
+				                                    struct thread, elem);
+    if (max_thread->priority > cur_thread->priority)
+      should_yield = true;
   }
+  intr_set_level (old_level);
+  if (should_yield) 
+    thread_yield();
 }
 
 void
