@@ -69,9 +69,6 @@ static bool is_thread (struct thread *) UNUSED;
 static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
-bool ready_list_compare (const struct list_elem *a,
-                           const struct list_elem *b,
-                           void *aux); 
 static tid_t allocate_tid (void);
 
 /* Initializes the threading system by transforming the code
@@ -151,9 +148,9 @@ thread_print_stats (void)
 }
 
 bool
-ready_list_compare (const struct list_elem *a,
-                        const struct list_elem *b,
-                        void *aux) {
+thread_priority_compare (const struct list_elem *a,
+                          const struct list_elem *b,
+                          void *aux) {
     (void) aux;
     struct thread *a_entry = list_entry (a, struct thread, elem);
     struct thread *b_entry = list_entry(b, struct thread, elem);
@@ -251,7 +248,7 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
 
-  list_insert_ordered (&ready_list, &t->elem, ready_list_compare, NULL);
+  list_insert_ordered (&ready_list, &t->elem, thread_priority_compare, NULL);
 
   t->status = THREAD_READY;
   
@@ -329,8 +326,12 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread)
-    list_insert_ordered (&ready_list, &cur->elem, ready_list_compare, NULL); 
+  if (cur != idle_thread) {
+    list_insert_ordered (&ready_list,
+                          &cur->elem,
+                          thread_priority_compare,
+                          NULL);
+  }
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
