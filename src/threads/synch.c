@@ -113,6 +113,7 @@ sema_up (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
+  sema->value++;
   if (!list_empty (&sema->waiters)) {
     struct list_elem *max_priority = list_min (&sema -> waiters,
                                                 thread_priority_compare,
@@ -120,7 +121,6 @@ sema_up (struct semaphore *sema)
     list_remove (max_priority);
     thread_unblock (list_entry (max_priority, struct thread, elem));
   }
-  sema->value++;
   intr_set_level (old_level);
 }
 
