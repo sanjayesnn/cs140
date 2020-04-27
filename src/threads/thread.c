@@ -366,6 +366,27 @@ thread_set_priority (int new_priority)
   }
 }
 
+void
+set_priority (struct thread *t, int new_priority)
+{
+  enum intr_level old_level;
+
+  old_level = intr_disable ();
+  if (t->status == THREAD_RUNNING) {
+    thread_set_priority (new_priority);
+  } else if (t->status == THREAD_BLOCKED) {
+    t->priority = new_priority;
+  } else if (t->status == THREAD_READY) {
+    list_remove(&t->elem); //check this
+    t->priority = new_priority;
+    list_insert_ordered (&ready_list,
+                          &t->elem,
+                          thread_priority_compare,
+                          NULL);
+  }
+  intr_set_level (old_level);
+}
+
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) 
