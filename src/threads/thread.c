@@ -69,6 +69,9 @@ static bool is_thread (struct thread *) UNUSED;
 static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
+bool ready_list_compare (const struct list_elem *a,
+                           const struct list_elem *b,
+                           void *aux); 
 static tid_t allocate_tid (void);
 
 /* Initializes the threading system by transforming the code
@@ -252,9 +255,11 @@ thread_unblock (struct thread *t)
 
   t->status = THREAD_READY;
   
-  struct thread *current = running_thread ();
-  if ((current != idle_thread) && !intr_context ())
+  if (intr_context ()) {
+    intr_yield_on_return();
+  } else if ((thread_current () != idle_thread)) {
     thread_yield ();
+  }
 
   intr_set_level (old_level);
 }
