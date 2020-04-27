@@ -154,7 +154,7 @@ ready_list_compare (const struct list_elem *a,
     (void) aux;
     struct thread *a_entry = list_entry (a, struct thread, elem);
     struct thread *b_entry = list_entry(b, struct thread, elem);
-    return a_entry->priority < b_entry->priority;
+    return a_entry->priority > b_entry->priority;
 }
 
 /* Creates a new kernel thread named NAME with the given initial
@@ -253,12 +253,8 @@ thread_unblock (struct thread *t)
   t->status = THREAD_READY;
   
   struct thread *current = running_thread ();
-  if(!list_empty (&ready_list)
-        && (list_entry (
-                    list_front (&ready_list), struct thread, elem
-                ) -> priority > current -> priority)) {
-        thread_yield ();
-  }
+  if ((current != idle_thread) && !intr_context ())
+    thread_yield ();
 
   intr_set_level (old_level);
 }
@@ -357,12 +353,8 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
-  if(!list_empty (&ready_list)
-        && (list_entry (
-                    list_front (&ready_list), struct thread, elem
-                ) -> priority > new_priority)) {
-        thread_yield ();
-    }
+  if (thread_current () != idle_thread)
+    thread_yield ();
 }
 
 /* Returns the current thread's priority. */
