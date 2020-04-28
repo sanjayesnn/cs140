@@ -318,12 +318,11 @@ lock_release (struct lock *lock)
           if (max_pri_thread->priority > max_priority)
             max_priority = max_pri_thread->priority; 
         }
-
-        int new_priority = (max_priority > original_priority) 
-                            ? max_priority : original_priority;
-        if (t->priority != new_priority)
-          set_priority (t, new_priority); 
     }
+    int new_priority = (max_priority > original_priority) 
+                        ? max_priority : original_priority;
+    if (t->priority != new_priority)
+      thread_set_priority (new_priority); 
 
     thread_unblock (to_unblock);
     /* Determine whether we should yield to unblocked thread */

@@ -360,8 +360,51 @@ thread_set_priority (int new_priority)
   struct thread *cur_thread = thread_current ();
   
   bool should_yield = false;
-  cur_thread->priority = new_priority;
 
+  int orig_priority = cur_thread->original_priority;
+  int cur_priority = cur_thread->priority;
+
+  if (orig_priority == new_priority) {
+      /* No change */
+      intr_set_level (old_level);
+      return;
+  }
+
+  if (cur_priority < new_priority) {
+      /* Increasing priority */
+      cur_thread->original_priority = new_priority;
+      cur_thread->priority = new_priority;
+  } else if (orig_priority != cur_priority) {
+      /* Thread has a donated priority, trying to decrease priority*/
+      cur_thread->original_priority = new_priority;
+  } else {
+      /* No donated priority, trying to decrease priority */
+      cur_thread->original_priority = new_priority;
+      int max_priority = PRI_MIN;
+      struct list_elem *e;
+      for (e = list_begin (&cur_thread->acquired_locks);
+          e != list_end (&cur_thread->acquired_locks);
+          e = list_next (e))
+      {
+          struct lock *l = list_entry (e, struct lock, lock_elem);
+          if (!list_empty (&l->semaphore.waiters)) {
+            struct list_elem *max_pri_elem = list_min (&l->semaphore.waiters,
+                                                    thread_priority_compare,
+                                                    NULL);
+            struct thread *max_pri_thread = list_entry (max_pri_elem,
+                                              struct thread,
+                                              elem);
+            if (max_pri_thread->priority > max_priority)
+              max_priority = max_pri_thread->priority;
+          }
+
+      }
+      new_priority = (max_priority > orig_priority)
+                          ? max_priority : orig_priority;
+      cur_thread->priority = new_priority;
+  }
+
+  /* Yields if needed*/
   if (!list_empty (&ready_list)) {
     struct thread *max_thread = list_entry (list_min (&ready_list,
 					                                  thread_priority_compare, NULL),
@@ -381,7 +424,7 @@ set_priority (struct thread *t, int new_priority)
 
   old_level = intr_disable ();
   if (t->status == THREAD_RUNNING) {
-    t->priority = new_priority;
+    thread_set_priority (new_priority);
   } else if (t->status == THREAD_BLOCKED) {
     t->priority = new_priority;
   } else if (t->status == THREAD_READY) {
