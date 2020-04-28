@@ -195,6 +195,8 @@ lock_init (struct lock *lock)
   sema_init (&lock->semaphore, 1);
 }
 
+
+const int MAX_NESTED_DONATIONS = 8;
 /* Acquires LOCK, sleeping until it becomes available if
    necessary.  The lock must not already be held by the current
    thread.
@@ -210,8 +212,42 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
-  sema_down (&lock->semaphore);
+  /* Code based on sema_down */
+  struct semaphore *sema = &lock->semaphore;
+  enum intr_level old_level;
+  old_level = intr_disable ();
+  /* Donates priority to other thread(s) */
+  if (sema->value == 0) {
+      struct thread *current_holder = lock->holder;
+      int priority = thread_current ()->priority;
+      for (int i=0; i<MAX_NESTED_DONATIONS; i++) {
+         if (current_holder->priority >= priority) break;
+         /* Donates priority */
+         set_priority(current_holder, priority);
+         if (!current_holder->lock_waiting_for) {
+            /* This thread isn't waiting for any locks */
+            break;
+         }
+         /* Attempts donating priority to next thread in the tree */
+         current_holder = current_holder->lock_waiting_for->holder;
+      }
+
+      /* Updates lock_waiting_for */
+      thread_current ()->lock_waiting_for=lock;
+  }
+      
+  while (sema->value == 0)
+    {
+        list_push_back (&sema->waiters, &thread_current ()->elem);
+        thread_block ();
+    }
+  sema->value--;
+
+  thread_current ()->lock_waiting_for=NULL;
+  list_push_back (&thread_current ()->acquired_locks, &lock->lock_elem);
+
   lock->holder = thread_current ();
+  intr_set_level (old_level);
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
