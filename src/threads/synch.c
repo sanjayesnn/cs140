@@ -191,7 +191,7 @@ lock_init (struct lock *lock)
   lock->holder = NULL;
   lock->lock_elem.prev = NULL;
   lock->lock_elem.next = NULL;
-  
+
   sema_init (&lock->semaphore, 1);
 }
 
@@ -247,6 +247,7 @@ lock_release (struct lock *lock)
   enum intr_level old_level = intr_disable ();
 
   lock->holder = NULL;
+  /* Remove lock_elem from acquired_locks list */
   if (lock->lock_elem.prev != NULL && lock->lock_elem.next != NULL)
     list_remove (&lock->lock_elem); 
 
@@ -254,19 +255,15 @@ lock_release (struct lock *lock)
   struct semaphore *sema = &lock->semaphore;
   int original_priority = t->original_priority;
   int max_priority = original_priority;
-
   bool should_yield = false;
+
   if (!list_empty (&sema->waiters)) {
     /* Determine which thread that was waiting for this lock to unblock */
-    struct list_elem *max_pri_elem = list_min (&sema -> waiters,
+    struct list_elem *max_pri_elem = list_min (&sema->waiters,
                                                 thread_priority_compare,
                                                 NULL); 
     struct thread *to_unblock = list_entry (max_pri_elem, struct thread, elem);
     list_remove (max_pri_elem);
-    thread_unblock (to_unblock);
-    /* Determine whether we should yield to unblocked thread */
-    if (t->priority > thread_current ()->priority)
-      should_yield = true;
 
     /* Update current thread's priority */
     struct list_elem *e;
@@ -286,9 +283,16 @@ lock_release (struct lock *lock)
             max_priority = max_pri_thread->priority; 
         }
 
-        if (max_priority > original_priority) 
-          set_priority (t, max_priority);
+        int new_priority = (max_priority > original_priority) 
+                            ? max_priority : original_priority;
+        if (t->priority != new_priority)
+          set_priority (t, new_priority); 
     }
+
+    thread_unblock (to_unblock);
+    /* Determine whether we should yield to unblocked thread */
+    if (to_unblock->priority > t->priority)
+      should_yield = true;
   }
 
   sema->value++;
