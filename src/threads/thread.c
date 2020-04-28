@@ -399,8 +399,8 @@ thread_set_priority (int new_priority)
           }
 
       }
-      new_priority = (max_priority > orig_priority)
-                          ? max_priority : orig_priority;
+      new_priority = (max_priority > new_priority)
+                          ? max_priority : new_priority;
       cur_thread->priority = new_priority;
   }
 
@@ -413,7 +413,7 @@ thread_set_priority (int new_priority)
       should_yield = true;
   }
   intr_set_level (old_level);
-  if (should_yield) 
+  if (should_yield)
     thread_yield();
 }
 
