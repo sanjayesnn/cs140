@@ -418,8 +418,7 @@ thread_set_priority (int new_priority)
     thread_yield();
 }
 
-/*
- * Change the priority of any thread, not necessarily the currently running
+/* Change the priority of any thread, not necessarily the currently running
  * thread. Will override donated priority if thread is not running. */
 void
 set_priority (struct thread *t, int new_priority)
