@@ -381,7 +381,7 @@ set_priority (struct thread *t, int new_priority)
 
   old_level = intr_disable ();
   if (t->status == THREAD_RUNNING) {
-    thread_set_priority (new_priority);
+    t->priority = new_priority;
   } else if (t->status == THREAD_BLOCKED) {
     t->priority = new_priority;
   } else if (t->status == THREAD_READY) {
@@ -519,7 +519,11 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->original_priority = priority;
+  t->lock_waiting_for = NULL;
   t->magic = THREAD_MAGIC;
+  
+  list_init(&t->acquired_locks);
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
