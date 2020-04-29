@@ -4,6 +4,7 @@
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
+#include "devices/timer.h"
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -50,9 +51,12 @@ static long long idle_ticks;    /* # of timer ticks spent idle. */
 static long long kernel_ticks;  /* # of timer ticks in kernel threads. */
 static long long user_ticks;    /* # of timer ticks in user programs. */
 
+
 /* Scheduling. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 static unsigned thread_ticks;   /* # of timer ticks since last yield. */
+
+static fixed_point_t load_avg;
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -98,6 +102,8 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+
+  load_avg = fix_int (0);
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -117,6 +123,33 @@ thread_start (void)
   sema_down (&idle_started);
 }
 
+void
+calculate_load_avg (void)
+{
+  int ready_threads = list_size (&ready_list);
+  if (thread_current () != idle_thread) ready_threads ++;
+
+  fixed_point_t coeff1 = fix_div (fix_int (59), fix_int (60));
+  fixed_point_t coeff2 = fix_div (fix_int (1), fix_int (60));
+
+  load_avg = fix_mul (coeff1, load_avg); 
+  fixed_point_t prod2 = fix_scale(coeff2, ready_threads);
+  load_avg = fix_add (load_avg, prod2);
+} 
+
+void
+calculate_recent_cpu (struct thread *t, void *aux)
+{
+  (void) aux;
+  fixed_point_t a = fix_scale (load_avg, 2);
+  fixed_point_t b = fix_add (a, fix_int (1));
+  fixed_point_t coeff = fix_div (a, b);
+
+  fixed_point_t prod = fix_mul (coeff, t->recent_cpu);
+  t->recent_cpu = fix_add (prod, fix_int (t->nice));
+} 
+
+
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
@@ -128,11 +161,20 @@ thread_tick (void)
   if (t == idle_thread)
     idle_ticks++;
 #ifdef USERPROG
-  else if (t->pagedir != NULL)
+  else if (t->pagedir != NULL) {
+    t->recent_cpu = fix_add (t->recent_cpu, fix_int (1));
     user_ticks++;
+  }
 #endif
-  else
+  else {
+    t->recent_cpu = fix_add (t->recent_cpu, fix_int (1));
     kernel_ticks++;
+  }
+
+  if (thread_mlfqs && timer_ticks () % TIMER_FREQ == 0) {
+    calculate_load_avg ();
+    thread_foreach (calculate_recent_cpu, NULL);
+  }
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
@@ -467,16 +509,14 @@ thread_get_nice (void)
 int
 thread_get_load_avg (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return fix_round (fix_scale (load_avg, 100));
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return fix_round (fix_scale (thread_current ()->recent_cpu, 100));
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -566,6 +606,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->original_priority = priority;
+  t->recent_cpu = fix_int (0);
   t->lock_waiting_for = NULL;
   t->magic = THREAD_MAGIC;
   

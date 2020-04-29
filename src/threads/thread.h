@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/fixed-point.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -105,6 +106,10 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
 
+    fixed_point_t recent_cpu;                     /* Recent cpu usage */
+
+    int nice;
+
     int64_t sleep_until;                /* If sleeping, sleeps until this tick */
     struct list_elem sleep_elem;        /* Sleep list element (see timer.c) */
   };
@@ -116,6 +121,10 @@ extern bool thread_mlfqs;
 
 void thread_init (void);
 void thread_start (void);
+
+/* Functions for 4.4BSD scheduler*/
+void calculate_load_avg (void);
+void calculate_recent_cpu (struct thread *t, void *aux);
 
 void thread_tick (void);
 void thread_print_stats (void);
