@@ -22,8 +22,14 @@
 #define THREAD_MAGIC 0xcd6abf4b
 
 /* List of processes in THREAD_READY state, that is, processes
-   that are ready to run but not actually running. */
+   that are ready to run but not actually running. Only used 
+   if thread_mlfqs is false */
 static struct list ready_list;
+
+/* List of ready lists for each priority level. Only used if 
+   thread_mlfqs is true. pri_queues[i] correspends to the
+   ready queue for threads with priority i. */
+static struct list pri_queues[PRI_MAX + 1];
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -54,6 +60,7 @@ static long long user_ticks;    /* # of timer ticks in user programs. */
 
 /* Scheduling. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
+#define PRI_UPDATE_INTERVAL 4
 static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 
 static fixed_point_t load_avg;
@@ -74,6 +81,10 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
+void update_priority (struct thread *t, void *aux);
+int num_ready_threads (void);
+void add_to_ready_queue (struct thread *t);
+struct thread *highest_priority_thread (void);
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -94,8 +105,14 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
-  list_init (&ready_list);
   list_init (&all_list);
+  if (thread_mlfqs) {
+    for (int i = 0; i <= PRI_MAX; i++)
+      {
+        list_init(&pri_queues[i]);
+      }
+  } else
+    list_init (&ready_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -126,7 +143,7 @@ thread_start (void)
 void
 calculate_load_avg (void)
 {
-  int ready_threads = list_size (&ready_list);
+  int ready_threads = num_ready_threads ();
   if (thread_current () != idle_thread) ready_threads ++;
 
   fixed_point_t coeff1 = fix_div (fix_int (59), fix_int (60));
@@ -147,7 +164,27 @@ calculate_recent_cpu (struct thread *t, void *aux)
 
   fixed_point_t prod = fix_mul (coeff, t->recent_cpu);
   t->recent_cpu = fix_add (prod, fix_int (t->nice));
-} 
+}
+
+/* Recalculates and updates priority for struct thread *t. Does not
+   switch running thread. */
+void
+update_priority (struct thread *t, void *aux)
+{
+  (void) aux;
+  fixed_point_t recent_cpu_term = fix_unscale (t->recent_cpu, 4);
+  fixed_point_t nice_term = fix_scale (fix_int (t->nice), 2);
+  fixed_point_t tmp = fix_sub (fix_int(PRI_MAX), recent_cpu_term);
+  fixed_point_t unrounded_priority = fix_sub (tmp, nice_term);
+
+  int priority = fix_trunc (unrounded_priority);
+  if (priority > PRI_MAX)
+      priority = PRI_MAX;
+  else if (priority < PRI_MIN)
+      priority = PRI_MIN;
+
+  t->priority = priority;
+}
 
 
 /* Called by the timer interrupt handler at each timer tick.
@@ -175,6 +212,9 @@ thread_tick (void)
     calculate_load_avg ();
     thread_foreach (calculate_recent_cpu, NULL);
   }
+
+  if (thread_mlfqs && timer_ticks () % PRI_UPDATE_INTERVAL == 0)
+      thread_foreach(update_priority, NULL);
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
@@ -293,7 +333,7 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
 
-  list_insert_ordered (&ready_list, &t->elem, thread_priority_compare, NULL);
+  add_to_ready_queue (t);
 
   t->status = THREAD_READY;
 
@@ -366,10 +406,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) {
-    list_insert_ordered (&ready_list,
-                          &cur->elem,
-                          thread_priority_compare,
-                          NULL);
+    add_to_ready_queue (cur);
   }
   cur->status = THREAD_READY;
   schedule ();
@@ -451,13 +488,9 @@ thread_set_priority (int new_priority)
   }
 
   /* Yields if needed*/
-  if (!list_empty (&ready_list)) {
-    struct thread *max_thread = list_entry (list_min (&ready_list,
-					                                  thread_priority_compare, NULL),
-				                                    struct thread, elem);
-    if (max_thread->priority > cur_thread->priority)
-      should_yield = true;
-  }
+  struct thread *max_thread = highest_priority_thread ();
+  if (max_thread->priority > cur_thread->priority)
+    should_yield = true;
   intr_set_level (old_level);
   if (should_yield)
     thread_yield();
@@ -478,10 +511,7 @@ set_priority (struct thread *t, int new_priority)
   } else if (t->status == THREAD_READY) {
     list_remove(&t->elem); //check this
     t->priority = new_priority;
-    list_insert_ordered (&ready_list,
-                          &t->elem,
-                          thread_priority_compare,
-                          NULL);
+    add_to_ready_queue (t);
   }
   intr_set_level (old_level);
 }
@@ -502,9 +532,9 @@ thread_set_nice (int new_nice)
   bool should_yield = false;
   struct thread *cur = thread_current();
   cur->nice = new_nice;
-  cur->priority = calculate_priority(cur);
+  update_priority(cur, NULL);
 
-  struct thread *max_pri = highest_priority_thread();
+  struct thread *max_pri = highest_priority_thread ();
   if (cur->priority < max_pri->priority)
     should_yield = true;
   
@@ -533,7 +563,62 @@ thread_get_recent_cpu (void)
 {
   return fix_round (fix_scale (thread_current ()->recent_cpu, 100));
 }
-
+
+/* Returns total number of all ready threads at all priority levels */
+int
+num_ready_threads (void)
+{
+  if (!thread_mlfqs)
+    return list_size (&ready_list);
+
+  int total_size = 0;
+  for (int i = 0; i < PRI_MAX; i++) 
+    {
+      total_size += list_size (&pri_queues[i]);
+    }
+  return total_size;
+}
+
+/* Adds t to the proper ready list, in the correct order, based on
+   whether we are in thread_mlfqs mode or not */
+void
+add_to_ready_queue (struct thread *t)
+{
+  if (thread_mlfqs)
+    list_push_back (&pri_queues[t->priority], &t->elem);
+  else
+    list_insert_ordered (&ready_list,
+                           &t->elem,
+                           thread_priority_compare,
+                           NULL);
+}
+
+/* Returns the current highest priority thread, without removing the thread */
+struct thread *
+highest_priority_thread (void)
+{
+  if (thread_mlfqs) {
+    for (int i = PRI_MAX; i >= 0; i--)
+      {
+        if (!list_empty (&pri_queues[i])) {
+          return list_entry (list_front (&pri_queues[i]),
+                               struct thread,
+                               elem);
+        }
+      }
+    return idle_thread;
+  } else {
+    if (!list_empty (&ready_list)) {
+      return list_entry (list_min (&ready_list,
+                                     thread_priority_compare,
+                                     NULL),
+                           struct thread,
+                           elem);
+      } else
+        return idle_thread;
+  }
+}
+
 /* Idle thread.  Executes when no other thread is ready to run.
 
    The idle thread is initially put on the ready list by
@@ -631,7 +716,7 @@ init_thread (struct thread *t, const char *name, int priority)
     else
       t->nice = thread_get_nice();
     
-    t->priority = calculate_priority(t);
+    update_priority (t, NULL);
   }
 
   list_init(&t->acquired_locks);
@@ -658,14 +743,16 @@ alloc_frame (struct thread *t, size_t size)
    return a thread from the run queue, unless the run queue is
    empty.  (If the running thread can continue running, then it
    will be in the run queue.)  If the run queue is empty, return
-   idle_thread. */
+   idle_thread. Removes thread from relevent ready queue. */
 static struct thread *
 next_thread_to_run (void) 
 {
-  if (list_empty (&ready_list))
-    return idle_thread;
-  else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  struct thread *highest_pri = highest_priority_thread ();
+  if (highest_pri == idle_thread)
+    return highest_pri;
+  
+  list_remove (&highest_pri->elem);
+  return highest_pri;  
 }
 
 /* Completes a thread switch by activating the new thread's page
