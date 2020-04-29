@@ -398,6 +398,9 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
+  if (thread_mlfqs)
+    return;
+
   /* Avoid race condition with modifying thread struct */
   enum intr_level old_level = intr_disable ();
   struct thread *cur_thread = thread_current ();
@@ -492,17 +495,29 @@ thread_get_priority (void)
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) 
+thread_set_nice (int new_nice) 
 {
-  /* Not yet implemented. */
+  enum intr_level old_level = intr_disable();
+
+  bool should_yield = false;
+  struct thread *cur = thread_current();
+  cur->nice = new_nice;
+  cur->priority = calculate_priority(cur);
+
+  struct thread *max_pri = highest_priority_thread();
+  if (cur->priority < max_pri->priority)
+    should_yield = true;
+  
+  intr_set_level (old_level);
+  if (should_yield)
+    thread_yield();
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return thread_current()->nice;
 }
 
 /* Returns 100 times the system load average. */
@@ -610,6 +625,15 @@ init_thread (struct thread *t, const char *name, int priority)
   t->lock_waiting_for = NULL;
   t->magic = THREAD_MAGIC;
   
+  if (thread_mlfqs) {
+    if (t == initial_thread) 
+      t->nice = 0;
+    else
+      t->nice = thread_get_nice();
+    
+    t->priority = calculate_priority(t);
+  }
+
   list_init(&t->acquired_locks);
 
   old_level = intr_disable ();
