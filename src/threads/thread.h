@@ -153,6 +153,8 @@ int thread_get_priority (void);
 void thread_set_priority (int);
 void set_priority (struct thread* t, int new_priority);
 
+int max_waiter_priority (struct thread *t);
+
 /* Comparison function for priority of two threads. */
 bool thread_priority_compare (const struct list_elem *a,
                                const struct list_elem *b,

@@ -303,7 +303,6 @@ lock_release (struct lock *lock)
   struct thread *t = thread_current ();
   struct semaphore *sema = &lock->semaphore;
   int original_priority = t->original_priority;
-  int max_priority = original_priority;
   bool should_yield = false;
 
   if (!list_empty (&sema->waiters)) 
@@ -320,24 +319,7 @@ lock_release (struct lock *lock)
       /* Update current thread's priority */
       if (!thread_mlfqs) 
         {
-          struct list_elem *e;
-      // TODO
-      for (e = list_begin (&t->acquired_locks); 
-          e != list_end (&t->acquired_locks); 
-          e = list_next (e)) 
-      {
-          struct lock *l = list_entry (e, struct lock, lock_elem);
-          if (!list_empty (&l->semaphore.waiters)) {
-            struct list_elem *max_pri_elem = list_min (&l->semaphore.waiters,
-                                                       thread_priority_compare,
-                                                       NULL);
-            struct thread *max_pri_thread = list_entry (max_pri_elem, 
-                                                        struct thread, 
-                                                        elem);
-            if (max_pri_thread->priority > max_priority)
-              max_priority = max_pri_thread->priority; 
-          } 
-      }
+          int max_priority = max_waiter_priority (t);
           int new_priority = (max_priority > original_priority) 
                               ? max_priority : original_priority;
           t->priority = new_priority;

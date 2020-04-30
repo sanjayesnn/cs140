@@ -441,6 +441,36 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
+/* Returns the maximum priority of all threads waiting 
+   for a lock held by the input thread. */
+int
+max_waiter_priority (struct thread *t) 
+{
+  int max_priority = PRI_MIN;
+  struct list_elem *e;
+  /* Loop over locks held by thread t */
+  for (e = list_begin (&t->acquired_locks); 
+        e != list_end (&t->acquired_locks); 
+        e = list_next (e)) 
+    {
+      struct lock *l = list_entry (e, struct lock, lock_elem);
+      /* Find the max priority waiter */
+      if (!list_empty (&l->semaphore.waiters)) 
+        {
+          struct list_elem *max_pri_elem = list_min (&l->semaphore.waiters,
+                                                    thread_priority_compare,
+                                                    NULL);
+          struct thread *max_pri_thread = list_entry (max_pri_elem, 
+                                                      struct thread, 
+                                                      elem);
+          if (max_pri_thread->priority > max_priority)
+            max_priority = max_pri_thread->priority; 
+        } 
+    }
+
+    return max_priority;
+}
+
 /* Sets the current thread's priority to NEW_PRIORITY.
  * Does NOT override potential donated priorities */
 void
@@ -480,25 +510,7 @@ thread_set_priority (int new_priority)
     {
         /* No donated priority, trying to decrease priority */
         cur_thread->original_priority = new_priority;
-        int max_priority = PRI_MIN;
-        struct list_elem *e;
-        for (e = list_begin (&cur_thread->acquired_locks);
-            e != list_end (&cur_thread->acquired_locks);
-            e = list_next (e))
-          {
-              struct lock *l = list_entry (e, struct lock, lock_elem);
-              if (!list_empty (&l->semaphore.waiters)) 
-                {
-                  struct list_elem *max_pri_elem = list_min (&l->semaphore.waiters,
-                                                          thread_priority_compare,
-                                                          NULL);
-                  struct thread *max_pri_thread = list_entry (max_pri_elem,
-                                                    struct thread,
-                                                    elem);
-                  if (max_pri_thread->priority > max_priority)
-                    max_priority = max_pri_thread->priority;
-                }
-          }
+        int max_priority = max_waiter_priority (cur_thread);
         new_priority = (max_priority > new_priority)
                         ? max_priority : new_priority;
         cur_thread->priority = new_priority;
