@@ -244,17 +244,17 @@ lock_acquire (struct lock *lock)
 
           /* Updates lock_waiting_for */
           thread_current ()->lock_waiting_for = lock;
-      }
+        }
         
-    while (sema->value == 0) 
-      {
-        list_push_back (&sema->waiters, &thread_current ()->elem);
-        thread_block ();
-      }
-    sema->value--;
-    thread_current ()->lock_waiting_for = NULL;
-    list_push_back (&thread_current ()->acquired_locks, &lock->lock_elem);
-  }
+      while (sema->value == 0) 
+        {
+          list_push_back (&sema->waiters, &thread_current ()->elem);
+          thread_block ();
+        }
+      sema->value--;
+      thread_current ()->lock_waiting_for = NULL;
+      list_push_back (&thread_current ()->acquired_locks, &lock->lock_elem);
+    } 
 
   else 
     sema_down (&lock->semaphore);
@@ -323,13 +323,13 @@ lock_release (struct lock *lock)
           int new_priority = (max_priority > original_priority) 
                               ? max_priority : original_priority;
           t->priority = new_priority;
-      }
+        }
 
-    thread_unblock (to_unblock);
-    /* Determine whether we should yield to unblocked thread */
-    if (to_unblock->priority > t->priority)
-      should_yield = true;
-  }
+      thread_unblock (to_unblock);
+      /* Determine whether we should yield to unblocked thread */
+      if (to_unblock->priority > t->priority)
+        should_yield = true;
+    }
 
   sema->value++;
   intr_set_level (old_level);
