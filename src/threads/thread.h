@@ -90,9 +90,9 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List elem for all threads list. */
-    int original_priority;              /* Original (pre-donation) priority */
-	struct list acquired_locks;         /* List of locks this thread holds */
-	struct lock *lock_waiting_for;      /* Lock this thread is waiting for */
+    int original_priority;              /* Original (pre-donate) priority. */
+	struct list acquired_locks;         /* List of locks this thread holds. */
+	struct lock *lock_waiting_for;      /* Lock this thread is waiting for. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -105,12 +105,12 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
 
-    fixed_point_t recent_cpu;           /* Recent cpu usage */
+    fixed_point_t recent_cpu;           /* Recent cpu usage. */
 
-    int nice;                           /* Thread niceness */
+    int nice;                           /* Thread niceness. */
 
-    int64_t sleep_until;                /* Tick to sleep to while asleep */
-    struct list_elem sleep_elem;        /* Sleep list element (see timer.c) */
+    int64_t sleep_until;                /* Tick to sleep to while asleep. */
+    struct list_elem sleep_elem;        /* Sleep list elem (see timer.c). */
   };
 
 /* If false (default), use round-robin scheduler.
@@ -121,7 +121,7 @@ extern bool thread_mlfqs;
 void thread_init (void);
 void thread_start (void);
 
-/* Functions for 4.4BSD scheduler */
+/* Functions for 4.4BSD scheduler. */
 void calculate_load_avg (void);
 void calculate_recent_cpu (struct thread *t, void *aux);
 int thread_get_nice (void);
@@ -153,7 +153,7 @@ int thread_get_priority (void);
 void thread_set_priority (int);
 void set_priority (struct thread* t, int new_priority);
 
-/* Comparison function for priority of two threads */
+/* Comparison function for priority of two threads. */
 bool thread_priority_compare (const struct list_elem *a,
                                const struct list_elem *b,
                                void *aux);
