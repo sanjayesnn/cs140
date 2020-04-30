@@ -32,6 +32,10 @@ static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
+bool list_less (const struct list_elem *a,
+                const struct list_elem *b,
+                void *aux);
+
 
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
@@ -40,7 +44,7 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
-  list_init(&sleep_list);
+  list_init (&sleep_list);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -97,26 +101,32 @@ timer_sleep (int64_t ticks)
   struct thread *current_thread = thread_current ();
   current_thread->sleep_until = end;
   
-  /* Disables interrupts (required for thread_block call) */ 
+  /* Disables interrupts (required for thread_block call). */ 
   intr_disable ();
 
-  /* Comparison function for list insert */
-  bool list_less (const struct list_elem *a,
-                    const struct list_elem *b,
-                    void *aux) {
-    (void) aux;
-    struct thread *a_entry = list_entry (a, struct thread, sleep_elem);
-    struct thread *b_entry = list_entry (b, struct thread, sleep_elem);
-    return a_entry->sleep_until < b_entry->sleep_until;
-  }
-
-  list_insert_ordered (&sleep_list, &(current_thread->sleep_elem), list_less, NULL );
+  list_insert_ordered (&sleep_list,
+                       &(current_thread->sleep_elem),
+                       list_less,
+                       NULL);
 
   thread_block ();
   /* Thread_block returns when the sleep time ends 
-   * -> interrupts turned back on */
+     -> interrupts turned back on. */
   intr_enable ();
 }
+
+/* Comparison function for list insert. */
+bool list_less (const struct list_elem *a,
+                const struct list_elem *b,
+                void *aux)
+{
+  (void) aux;
+  struct thread *a_entry = list_entry (a, struct thread, sleep_elem);
+  struct thread *b_entry = list_entry (b, struct thread, sleep_elem);
+  return a_entry->sleep_until < b_entry->sleep_until;
+}
+
+
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
    turned on. */
@@ -196,13 +206,13 @@ timer_interrupt (struct intr_frame *args UNUSED)
 
   /* Unblocks all threads whose sleep time has ended */
   while (!list_empty (&sleep_list) 
-          && (list_entry (
-                list_front (&sleep_list), struct thread, sleep_elem
-              ) -> sleep_until <= timer_ticks ())) {
-    struct list_elem *head = list_pop_front (&sleep_list);
-    struct thread *next_thread = list_entry (head, struct thread, sleep_elem);
-    thread_unblock (next_thread);
-  }
+          && (list_entry (list_front (&sleep_list), struct thread, sleep_elem)
+              ->sleep_until <= timer_ticks ()))
+    {
+      struct list_elem *head = list_pop_front (&sleep_list);
+      struct thread *next_thread = list_entry (head, struct thread, sleep_elem);
+      thread_unblock (next_thread);
+    }
   
   thread_tick ();
 }
