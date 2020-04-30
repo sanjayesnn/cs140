@@ -89,11 +89,10 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
-    struct list_elem allelem;           /* List element for all threads list. */
-    int original_priority;              /* Original priority before priority donation */
-	 struct list acquired_locks;         /* List of locks this thread holds */
-	 struct lock *lock_waiting_for;      /* Lock this thread is waiting for */
-
+    struct list_elem allelem;           /* List elem for all threads list. */
+    int original_priority;              /* Original (pre-donation) priority */
+	struct list acquired_locks;         /* List of locks this thread holds */
+	struct lock *lock_waiting_for;      /* Lock this thread is waiting for */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -106,11 +105,11 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
 
-    fixed_point_t recent_cpu;                     /* Recent cpu usage */
+    fixed_point_t recent_cpu;           /* Recent cpu usage */
 
-    int nice;
+    int nice;                           /* Thread niceness */
 
-    int64_t sleep_until;                /* If sleeping, sleeps until this tick */
+    int64_t sleep_until;                /* Tick to sleep to while asleep */
     struct list_elem sleep_elem;        /* Sleep list element (see timer.c) */
   };
 
@@ -122,9 +121,13 @@ extern bool thread_mlfqs;
 void thread_init (void);
 void thread_start (void);
 
-/* Functions for 4.4BSD scheduler*/
+/* Functions for 4.4BSD scheduler */
 void calculate_load_avg (void);
 void calculate_recent_cpu (struct thread *t, void *aux);
+int thread_get_nice (void);
+void thread_set_nice (int);
+int thread_get_recent_cpu (void);
+int thread_get_load_avg (void);
 
 void thread_tick (void);
 void thread_print_stats (void);
@@ -149,13 +152,10 @@ void thread_foreach (thread_action_func *, void *);
 int thread_get_priority (void);
 void thread_set_priority (int);
 void set_priority (struct thread* t, int new_priority);
+
+/* Comparison function for priority of two threads */
 bool thread_priority_compare (const struct list_elem *a,
                                const struct list_elem *b,
                                void *aux);
-
-int thread_get_nice (void);
-void thread_set_nice (int);
-int thread_get_recent_cpu (void);
-int thread_get_load_avg (void);
 
 #endif /* threads/thread.h */
