@@ -6,6 +6,9 @@
 #include "threads/pte.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "devices/shutdown.h"
+#include "filesys/file.h"
+#include "filesys/filesys.h"
 
 /* Each syscall argument takes up 4 bytes on the stack. */
 #define ARG_SIZE 4
@@ -116,12 +119,13 @@ call_syscall (struct intr_frame *f, int syscall)
 void
 halt (void)
 {
+    shutdown_power_off ();
 }
 
 void
 exit (int status)
 {
-  process_exit ();
+  process_exit (); // TODO: this doesn't seem to exist?
   thread_exit ();
 }
 
@@ -140,13 +144,17 @@ wait (pid_t pid)
 bool
 create (const char *file, unsigned initial_size)
 {
- return false;
+  return filesys_create (file, initial_size);
 }
 
 bool
 remove (const char *file)
 {
-  return false;
+  return filesys_remove (file);
+}
+/* Helper method for getting the file struct of a given fd */
+struct file *get_file_with_fd (int fd) {
+  return NULL;
 }
 
 int
@@ -158,7 +166,10 @@ open (const char *file)
 int
 filesize (int fd)
 {
-  return -1;
+  struct file* f = get_file_with_fd (fd);
+  if (f == NULL) return -1; // TODO: what do we do when this fails?
+
+  return file_length (f); 
 }
 
 int
@@ -176,12 +187,19 @@ write (int fd, const void *buffer, unsigned size)
 void
 seek (int fd, unsigned position)
 {
+  struct file* f = get_file_with_fd (fd);
+  if (f == NULL) return;
+
+  file_seek (f, position);
 }
 
 unsigned
 tell (int fd)
 {
-  return 0;
+  struct file* f = get_file_with_fd (fd);
+  if (f == NULL) return 0; // TODO: what do we do when this fails?
+
+  return file_tell (f);
 }
 
 void
