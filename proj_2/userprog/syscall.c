@@ -16,8 +16,7 @@
 typedef int pid_t;
 
 static void syscall_handler (struct intr_frame *);
-static bool is_valid_ptr (const void *vaddr);
-static bool is_writable_ptr (const void *vaddr);
+static bool is_valid_memory_range (const void *vaddr, size_t size, bool is_writable);
 static void* get_nth_syscall_arg (void *esp, int n);
 static void call_syscall (struct intr_frame *f, int syscall);
 
@@ -210,28 +209,28 @@ close (int fd)
 
 /* Determines whether the supplied pointer references valid user memory. */
 static bool
-is_valid_ptr (const void *vaddr) 
+is_valid_memory_range (const void *vaddr, size_t size, bool is_writable) 
 {
-  if (vaddr == NULL || !is_user_vaddr (vaddr))
-      return false;
-  
-  uint32_t *pte = lookup_page (thread_current ()->pagedir, vaddr, false);
-  if ((*pte & PTE_P) == 0 || (*pte & PTE_U) == 0)
-    return false;
+  /* Start at the beginning of the page. */
+  void *upage = pg_round_down (vaddr);
+  /* Check every page in the given range. */
+  while (upage < vaddr + size)
+    {
+      if (upage == NULL || !is_user_vaddr (upage))
+        return false;
+
+      uint32_t *pte = lookup_page (thread_current ()->pagedir, upage, false);
+      /* Page is present and user accessible. */
+      if ((*pte & PTE_P) == 0 || (*pte & PTE_U) == 0)
+        return false;
+      /* Page is writable. */
+      if (is_writable && (*pte & PTE_W) == 0)
+        return false;
+      
+      upage += PGSIZE;
+    }
   
   return true;
-}
-
-/* Determines whether the supplied pointer references writable user memory. */
-static bool
-is_writable_ptr (const void *vaddr) 
-{
-  if (!is_valid_ptr (vaddr))
-    return false;
-
-  uint32_t *pte = lookup_page (thread_current ()->pagedir, vaddr, false);
-  if ((*pte & PTE_W) == 0)
-    return false;
 }
 
 /* Returns a pointer to the n-th argument of a syscall. Args are 1-indexed */
