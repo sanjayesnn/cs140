@@ -44,7 +44,6 @@ syscall_handler (struct intr_frame *f UNUSED)
   printf ("system call!\n");
   int syscall = * (int *) f->esp;
   call_syscall (f, syscall);
-  thread_exit ();
 }
 
 static void
@@ -122,6 +121,8 @@ halt (void)
 void
 exit (int status)
 {
+  process_exit ();
+  thread_exit ();
 }
 
 pid_t
