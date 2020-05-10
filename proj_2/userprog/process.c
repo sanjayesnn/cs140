@@ -88,7 +88,7 @@ start_process (void *cmdline_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  return -1;
+  while (true);
 }
 
 /* Free the current process's resources. */
