@@ -13,6 +13,9 @@
 
 /* Each syscall argument takes up 4 bytes on the stack. */
 #define ARG_SIZE 4
+#define INPUT_FD 0
+#define CONSOLE_FD 1
+#define MAX_PUT_SIZE 200
 
 typedef int pid_t;
 
@@ -208,13 +211,43 @@ filesize (int fd)
 int
 read (int fd, void *buffer, unsigned size)
 {
-  return -1;
+  uint8_t *buf = (uint8_t *) buffer;
+  if (fd == INPUT_FD)
+    {
+      int keys_read = 0;
+      for (; keys_read < size; keys_read++)
+        {
+          uint8_t next_char = input_getc ();
+          buf[keys_read] = next_char;
+        }
+      return keys_read;
+    }
+  else
+    {
+      struct file_data *f = get_file_with_fd (fd);
+      if (f == NULL) return -1; //TODO: what to do when this fails
+      return -1;
+    }
 }
 
 int
 write (int fd, const void *buffer, unsigned size)
 {
-  return -1;
+  uint8_t *buf = (uint8_t *) buffer;
+  if (fd == CONSOLE_FD)
+    {
+      for (int start = 0; start < size; start += MAX_PUT_SIZE)
+        {
+          putbuf (buf + start, MAX_PUT_SIZE);
+        }
+      return size;
+    }
+  else
+    {
+      struct file_data *f = get_file_with_fd (fd);
+      if (f == NULL) return -1; //TODO: what to do when this fails
+      return -1;
+    }
 }
 
 void
