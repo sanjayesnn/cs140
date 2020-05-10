@@ -17,7 +17,8 @@ typedef int pid_t;
 
 static void syscall_handler (struct intr_frame *);
 static bool is_valid_memory_range (const void *vaddr, size_t size, bool is_writable);
-static void* get_nth_syscall_arg (void *esp, int n);
+struct file *get_file_with_fd (int fd);
+static void *get_nth_syscall_arg (void *esp, int n);
 static void call_syscall (struct intr_frame *f, int syscall);
 
 void halt (void);
@@ -151,8 +152,21 @@ remove (const char *file)
 {
   return filesys_remove (file);
 }
-/* Helper method for getting the file struct of a given fd */
-struct file *get_file_with_fd (int fd) {
+
+/* Gets the file_data struct for a given file descriptor. */
+struct file *
+get_file_with_fd (int fd) 
+{
+  struct thread *cur = thread_current ();
+  struct list_elem *e;
+  for (e = list_begin (&cur->open_files); e != list_end (&cur->open_files);
+       e = list_next (e)) 
+    {
+      struct file_data *fdata = list_entry (e, struct file_data, elem);
+      if (fdata->fd == fd) 
+          return fdata->file_ptr;
+    }
+
   return NULL;
 }
 

@@ -14,6 +14,14 @@ enum thread_status
     THREAD_DYING        /* About to be destroyed. */
   };
 
+/* Data associated with an open file. */
+struct file_data
+  {
+    struct file *file_ptr;        /* Pointer to file struct. */
+    int fd;                       /* File descriptor number. */
+    struct list_elem elem;        /* List element for open files list. */
+  };
+
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
 typedef int tid_t;
@@ -96,6 +104,7 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    struct list open_files;             /* List of open files. */
 #endif
 
     /* Owned by thread.c. */
