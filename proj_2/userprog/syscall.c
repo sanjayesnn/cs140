@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
+#include "threads/malloc.h"
 #include "threads/pte.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
@@ -17,7 +18,7 @@ typedef int pid_t;
 
 static void syscall_handler (struct intr_frame *);
 static bool is_valid_memory_range (const void *vaddr, size_t size, bool is_writable);
-struct file *get_file_with_fd (int fd);
+struct file_data *get_file_with_fd (int fd);
 static void *get_nth_syscall_arg (void *esp, int n);
 static void call_syscall (struct intr_frame *f, int syscall);
 
@@ -154,7 +155,7 @@ remove (const char *file)
 }
 
 /* Gets the file_data struct for a given file descriptor. */
-struct file *
+struct file_data *
 get_file_with_fd (int fd) 
 {
   struct thread *cur = thread_current ();
@@ -164,7 +165,7 @@ get_file_with_fd (int fd)
     {
       struct file_data *fdata = list_entry (e, struct file_data, elem);
       if (fdata->fd == fd) 
-          return fdata->file_ptr;
+          return fdata;
     }
 
   return NULL;
@@ -173,16 +174,35 @@ get_file_with_fd (int fd)
 int
 open (const char *file)
 {
-  return -1;
+  struct thread *cur = thread_current ();
+  struct file *f = filesys_open (file);
+  if (f == NULL)
+    return -1;
+  
+  struct file_data *fdata = malloc (sizeof (struct file_data));
+  fdata->file_ptr = f;
+
+  /* Determine the file descriptor number. */
+  if (list_empty (&cur->open_files))
+    fdata->fd = 2;
+  else
+    {
+      struct file_data *back = list_entry (list_back (&cur->open_files), 
+                                          struct file_data, elem);
+      fdata->fd = back->fd + 1;
+    }
+
+  list_push_back (&cur->open_files, &fdata->elem);
+  return fdata->fd;
 }
 
 int
 filesize (int fd)
 {
-  struct file* f = get_file_with_fd (fd);
+  struct file_data *f = get_file_with_fd (fd);
   if (f == NULL) return -1; // TODO: what do we do when this fails?
 
-  return file_length (f); 
+  return file_length (f->file_ptr); 
 }
 
 int
@@ -200,24 +220,31 @@ write (int fd, const void *buffer, unsigned size)
 void
 seek (int fd, unsigned position)
 {
-  struct file* f = get_file_with_fd (fd);
+  struct file_data *f = get_file_with_fd (fd);
   if (f == NULL) return;
 
-  file_seek (f, position);
+  file_seek (f->file_ptr, position);
 }
 
 unsigned
 tell (int fd)
 {
-  struct file* f = get_file_with_fd (fd);
+  struct file_data *f = get_file_with_fd (fd);
   if (f == NULL) return 0; // TODO: what do we do when this fails?
 
-  return file_tell (f);
+  return file_tell (f->file_ptr);
 }
 
 void
 close (int fd)
 {
+  struct file_data *f = get_file_with_fd (fd);
+  if (f == NULL) 
+    return;
+  
+  file_close (f->file_ptr);
+  list_remove (&f->elem);
+  free (f);
 }
 
 
