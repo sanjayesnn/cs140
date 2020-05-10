@@ -1,4 +1,5 @@
 #include "userprog/pagedir.h"
+#include "userprog/process.h"
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <syscall-nr.h>
@@ -8,6 +9,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
+#include "devices/input.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 
@@ -211,11 +213,11 @@ filesize (int fd)
 int
 read (int fd, void *buffer, unsigned size)
 {
-  uint8_t *buf = (uint8_t *) buffer;
   if (fd == INPUT_FD)
     {
+      uint8_t *buf = (uint8_t *) buffer;
       int keys_read = 0;
-      for (; keys_read < size; keys_read++)
+      for (; (unsigned) keys_read < size; keys_read++)
         {
           uint8_t next_char = input_getc ();
           buf[keys_read] = next_char;
@@ -226,19 +228,18 @@ read (int fd, void *buffer, unsigned size)
     {
       struct file_data *f = get_file_with_fd (fd);
       if (f == NULL) return -1; //TODO: what to do when this fails
-      return -1;
+      return file_read (f->file_ptr, buffer, size); 
     }
 }
 
 int
 write (int fd, const void *buffer, unsigned size)
 {
-  uint8_t *buf = (uint8_t *) buffer;
   if (fd == CONSOLE_FD)
     {
-      for (int start = 0; start < size; start += MAX_PUT_SIZE)
+      for (unsigned start = 0; start < size; start += MAX_PUT_SIZE)
         {
-          putbuf (buf + start, MAX_PUT_SIZE);
+          putbuf (buffer + start, MAX_PUT_SIZE);
         }
       return size;
     }
@@ -246,7 +247,7 @@ write (int fd, const void *buffer, unsigned size)
     {
       struct file_data *f = get_file_with_fd (fd);
       if (f == NULL) return -1; //TODO: what to do when this fails
-      return -1;
+      return file_write (f->file_ptr, buffer, size);
     }
 }
 
