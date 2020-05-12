@@ -50,7 +50,7 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  printf ("system call!\n");
+  //printf ("system call!\n");
   int syscall = * (int *) f->esp;
   call_syscall (f, syscall);
 }
@@ -131,7 +131,7 @@ halt (void)
 void
 exit (int status)
 {
-  process_exit (); // TODO: this doesn't seem to exist?
+  process_exit ();
   thread_exit ();
 }
 
@@ -239,7 +239,8 @@ write (int fd, const void *buffer, unsigned size)
     {
       for (unsigned start = 0; start < size; start += MAX_PUT_SIZE)
         {
-          putbuf (buffer + start, MAX_PUT_SIZE);
+          putbuf (buffer + start,
+                  (MAX_PUT_SIZE < size - start) ? MAX_PUT_SIZE : size - start);
         }
       return size;
     }
