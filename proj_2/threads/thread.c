@@ -8,12 +8,10 @@
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
 #include "threads/palloc.h"
+#include "threads/malloc.h"
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
-#ifdef USERPROG
-#include "userprog/process.h"
-#endif
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -197,6 +195,17 @@ thread_create (const char *name, int priority,
   sf = alloc_frame (t, sizeof *sf);
   sf->eip = switch_entry;
   sf->ebp = 0;
+
+#ifdef USERPROG
+  t->self_process = malloc (sizeof(struct process));
+  t->self_process->pid = tid;
+  t->self_process->exit_status = -1;
+  t->self_process->self_thread = t;
+  sema_init (&t->self_process->exit_sema, 0);
+  
+  struct thread *cur = thread_current ();
+  list_push_back (&cur->child_processes, &t->self_process->elem);
+#endif
 
   /* Add to run queue. */
   thread_unblock (t);
@@ -464,7 +473,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
 
+#ifdef USERPROG
   list_init (&t->open_files);
+  list_init (&t->child_processes);
+  lock_init (&t->self_process_lock);
+#endif
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
