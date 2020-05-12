@@ -89,7 +89,6 @@ start_process (void *cmdline_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  printf("Entering process_wait infinite loop");
   while (true);
 }
 
@@ -538,10 +537,9 @@ install_page (void *upage, void *kpage, bool writable)
 void
 process_free_children (void)
 {
-  struct list children = thread_current ()->child_processes;
-  struct list_elem *cur_elem = list_begin (&children);
-  struct list_elem *end = list_end (&children);
-  while (cur_elem != end)
+  struct thread *cur = thread_current ();
+  struct list_elem *cur_elem = list_begin (&cur->child_processes);
+  while (cur_elem != list_end (&cur->child_processes))
     {
       struct process *cur_child = list_entry (cur_elem, struct process, elem);
       struct thread *cur_child_thread = cur_child->self_thread;
