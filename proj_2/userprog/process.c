@@ -15,6 +15,7 @@
 #include "threads/init.h"
 #include "threads/interrupt.h"
 #include "threads/palloc.h"
+#include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
@@ -88,6 +89,7 @@ start_process (void *cmdline_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  printf("Entering process_wait infinite loop");
   while (true);
 }
 
@@ -111,6 +113,7 @@ process_exit (void)
          directory, or our active page directory will be one
          that's been freed (and cleared). */
       cur->pagedir = NULL;
+      pagedir_activate (NULL);
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
@@ -470,7 +473,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
         return false;
 
       /* Load this page. */
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
           palloc_free_page (kpage);
           return false; 
@@ -531,4 +533,26 @@ install_page (void *upage, void *kpage, bool writable)
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+
+void
+process_free_children (void)
+{
+  struct list children = thread_current ()->child_processes;
+  struct list_elem *cur_elem = list_begin (&children);
+  struct list_elem *end = list_end (&children);
+  while (cur_elem != end)
+    {
+      struct process *cur_child = list_entry (cur_elem, struct process, elem);
+      struct thread *cur_child_thread = cur_child->self_thread;
+      struct list_elem *next = list_next (cur_elem);
+
+      lock_acquire (&cur_child_thread->self_process_lock);
+      list_remove (cur_elem);
+      free (cur_child);
+      cur_child_thread->self_process = NULL;
+      lock_release (&cur_child_thread->self_process_lock);
+
+      cur_elem = next;
+    }
 }

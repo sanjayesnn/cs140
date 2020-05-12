@@ -292,7 +292,14 @@ thread_exit (void)
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
+  process_free_children ();
   process_exit ();
+  
+  struct thread *cur = thread_current ();
+  lock_acquire (&cur->self_process_lock);
+  if (cur->self_process != NULL)
+    sema_up (&cur->self_process->exit_sema);
+  lock_release (&cur->self_process_lock);
 #endif
 
   /* Remove thread from all threads list, set our status to dying,
@@ -384,7 +391,7 @@ thread_get_recent_cpu (void)
   /* Not yet implemented. */
   return 0;
 }
-
+
 /* Idle thread.  Executes when no other thread is ready to run.
 
    The idle thread is initially put on the ready list by
