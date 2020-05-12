@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "userprog/pagedir.h"
 #include "userprog/process.h"
 #include "userprog/syscall.h"
@@ -50,7 +52,6 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  //printf ("system call!\n");
   int syscall = * (int *) f->esp;
   call_syscall (f, syscall);
 }
@@ -125,19 +126,21 @@ call_syscall (struct intr_frame *f, int syscall)
 void
 halt (void)
 {
-    shutdown_power_off ();
+  shutdown_power_off ();
 }
 
 void
 exit (int status)
 {
-  process_exit ();
   thread_exit ();
 }
 
 pid_t
 exec (const char *cmd_line)
 {
+  if (!is_valid_memory_range (cmd_line, strlen (cmd_line) + 1, false))
+    exit (-1);
+
   return -1;
 }
 
@@ -150,12 +153,18 @@ wait (pid_t pid)
 bool
 create (const char *file, unsigned initial_size)
 {
+  if (!is_valid_memory_range (file, strlen (file) + 1, false))
+    exit (-1);
+
   return filesys_create (file, initial_size);
 }
 
 bool
 remove (const char *file)
 {
+  if (!is_valid_memory_range (file, strlen (file) + 1, false))
+    exit (-1);
+
   return filesys_remove (file);
 }
 
@@ -179,6 +188,9 @@ get_file_with_fd (int fd)
 int
 open (const char *file)
 {
+  if (!is_valid_memory_range (file, strlen (file) + 1, false))
+    exit (-1);
+
   struct thread *cur = thread_current ();
   struct file *f = filesys_open (file);
   if (f == NULL)
@@ -213,6 +225,9 @@ filesize (int fd)
 int
 read (int fd, void *buffer, unsigned size)
 {
+  if (!is_valid_memory_range (buffer, size, true))
+    exit (-1);
+
   if (fd == INPUT_FD)
     {
       uint8_t *buf = (uint8_t *) buffer;
@@ -235,6 +250,9 @@ read (int fd, void *buffer, unsigned size)
 int
 write (int fd, const void *buffer, unsigned size)
 {
+  if (!is_valid_memory_range (buffer, size, false))
+    exit (-1);
+
   if (fd == CONSOLE_FD)
     {
       for (unsigned start = 0; start < size; start += MAX_PUT_SIZE)
@@ -296,9 +314,6 @@ is_valid_memory_range (const void *vaddr, size_t size, bool is_writable)
         return false;
 
       uint32_t *pte = lookup_page (thread_current ()->pagedir, upage, false);
-      /* Page is present and user accessible. */
-      if ((*pte & PTE_P) == 0 || (*pte & PTE_U) == 0)
-        return false;
       /* Page is writable. */
       if (is_writable && (*pte & PTE_W) == 0)
         return false;
