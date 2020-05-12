@@ -139,16 +139,44 @@ exit (int status)
 pid_t
 exec (const char *cmd_line)
 {
+    printf("EXEC\n");
   if (!is_valid_memory_range (cmd_line, strlen (cmd_line) + 1, false))
     exit (-1);
 
-  return -1;
+  return process_execute(cmd_line);
 }
 
 int
 wait (pid_t pid)
 {
-  return -1;
+  struct list_elem *e;
+  struct process *child = NULL;
+        printf("A\n");
+  struct list children = thread_current ()->child_processes;
+  if (list_empty (&children)) return -1;
+        printf("B\n");
+  for (e = list_begin (&children); e != list_end (&children);
+    e = list_next (e))
+    {
+        printf("H\n");
+      struct process *child_process = list_entry (e, struct process, elem);
+      printf("Got process num %d, name %s\n", child_process->pid, child_process->self_thread->name);
+      if (child_process->pid == pid) 
+      {
+        child = child_process;
+        break;
+      }
+    }
+
+  if (child == NULL) return -1;
+  sema_down (&child->exit_sema);
+  
+  int status = child->exit_status;
+  // Removes this child process from the child list and frees its struct
+  list_remove (e);
+  free (child);
+
+  return status;
 }
 
 bool
