@@ -132,6 +132,7 @@ halt (void)
 void
 exit (int status)
 {
+  thread_current ()->self_process->exit_status = status;
   thread_exit ();
 }
 
