@@ -1,5 +1,6 @@
 #include <string.h>
 
+#include "userprog/exception.h"
 #include "userprog/pagedir.h"
 #include "userprog/process.h"
 #include "userprog/syscall.h"
@@ -26,6 +27,7 @@ struct lock fs_lock;
 typedef int pid_t;
 
 static void syscall_handler (struct intr_frame *);
+static bool is_valid_string_memory (const void *vaddr);
 static bool is_valid_memory_range (const void *vaddr, size_t size, bool is_writable);
 struct file_data *get_file_with_fd (int fd);
 static void *get_nth_syscall_arg (void *esp, int n);
@@ -58,7 +60,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   void *esp = f->esp;
   if (!is_valid_memory_range (esp, ARG_SIZE, false))
     exit (-1);
-    
+
   int syscall = * (int *) esp;
   call_syscall (f, syscall);
 }
@@ -126,7 +128,7 @@ call_syscall (struct intr_frame *f, int syscall)
         close (fd);
         break;
       default : ;
-        /* TODO: add error handling for invalid syscall # */
+        exit (-1);
     }
 }
 
@@ -159,7 +161,7 @@ exit (int status)
 pid_t
 exec (const char *cmd_line)
 {
-  if (!is_valid_memory_range (cmd_line, strlen (cmd_line) + 1, false))
+  if (is_valid_string_memory (cmd_line))
     exit (-1);
 
   return process_execute(cmd_line);
@@ -174,7 +176,7 @@ wait (pid_t pid)
 bool
 create (const char *file, unsigned initial_size)
 {
-  if (!is_valid_memory_range (file, strlen (file) + 1, false))
+  if (is_valid_string_memory (file))
     exit (-1);
 
   lock_acquire (&fs_lock);
@@ -186,7 +188,7 @@ create (const char *file, unsigned initial_size)
 bool
 remove (const char *file)
 {
-  if (!is_valid_memory_range (file, strlen (file) + 1, false))
+  if (is_valid_string_memory (file))
     exit (-1);
 
   lock_acquire (&fs_lock);
@@ -215,7 +217,7 @@ get_file_with_fd (int fd)
 int
 open (const char *file)
 {
-  if (!is_valid_memory_range (file, strlen (file) + 1, false))
+  if (is_valid_string_memory (file))
     exit (-1);
 
   struct thread *cur = thread_current ();
@@ -345,6 +347,38 @@ close (int fd)
   free (f);
 }
 
+static bool
+is_valid_string_memory (const void *vaddr) 
+{
+  if (vaddr == NULL)
+    return false;
+
+  /* Start at the beginning of the page. */
+  void *upage = pg_round_down (vaddr);
+  char *cur = (char *) vaddr;
+
+  /* Check every page in the given range. */
+  while (true)
+    {
+      if (upage == NULL || !is_user_vaddr (upage))
+        return false;
+
+      uint32_t *pte = lookup_page (thread_current ()->pagedir, upage, false);
+      if (pte == NULL || (*pte & PTE_P) == 0)
+        return false;
+      
+      while (cur < (char *) upage + PGSIZE) 
+        {
+          if (*cur == '\0')
+            return true;
+
+          cur++;
+        }
+      upage = (char *) upage + PGSIZE;
+    }
+  
+  return true;
+}
 
 /* Determines whether the supplied pointer references valid user memory. */
 static bool
@@ -356,19 +390,19 @@ is_valid_memory_range (const void *vaddr, size_t size, bool is_writable)
   /* Start at the beginning of the page. */
   void *upage = pg_round_down (vaddr);
   /* Check every page in the given range. */
-  while (upage < vaddr + size)
+  while ((char *) upage < (char *) vaddr + size)
     {
       if (upage == NULL || !is_user_vaddr (upage))
         return false;
 
       uint32_t *pte = lookup_page (thread_current ()->pagedir, upage, false);
-      if (pte == NULL)
+      if (pte == NULL || (*pte & PTE_P) == 0)
         return false;
       /* Page is writable. */
       if (is_writable && (*pte & PTE_W) == 0)
         return false;
       
-      upage += PGSIZE;
+      upage = (char *) upage + PGSIZE;
     }
   
   return true;
@@ -378,8 +412,8 @@ is_valid_memory_range (const void *vaddr, size_t size, bool is_writable)
 static void*
 get_nth_syscall_arg (void *esp, int n)
 {
-  if (!is_valid_memory_range (esp + ARG_SIZE * n, ARG_SIZE, false))
+  if (!is_valid_memory_range ((char *) esp + ARG_SIZE * n, ARG_SIZE, false))
     exit (-1);
 
-  return esp + ARG_SIZE * n;
+  return (char *) esp + ARG_SIZE * n;
 }
