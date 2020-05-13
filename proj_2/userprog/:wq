@@ -91,13 +91,16 @@ process_wait (tid_t child_tid)
 {
   struct list_elem *e;
   struct process *child = NULL;
+        printf("A\n");
   struct list children = thread_current ()->child_processes;
   if (list_empty (&children)) return -1;
+        printf("B\n");
   for (e = list_begin (&children); e != list_end (&children);
     e = list_next (e))
     {
-      struct process *child_process = list_entry (e, struct process, elem);      
-      if (child_process->pid == child_tid)
+        printf("H\n");
+      struct process *child_process = list_entry (e, struct process, elem);      printf("Got process num %d, name %s\n", child_process->pid, child_process->self_thread->name);
+      if (child_process->pid == pid)
       {
         child = child_process;
         break;
@@ -112,9 +115,8 @@ process_wait (tid_t child_tid)
   list_remove (e);
   free (child);
 
-  printf("Child returned with status %d\n", status);
-
   return status;
+}
 }
 
 /* Free the current process's resources. */

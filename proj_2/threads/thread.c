@@ -164,6 +164,7 @@ tid_t
 thread_create (const char *name, int priority,
                thread_func *function, void *aux) 
 {
+    printf("CREATE THREAD\n");
   struct thread *t;
   struct kernel_thread_frame *kf;
   struct switch_entry_frame *ef;
@@ -195,7 +196,6 @@ thread_create (const char *name, int priority,
   sf = alloc_frame (t, sizeof *sf);
   sf->eip = switch_entry;
   sf->ebp = 0;
-
 #ifdef USERPROG
   t->self_process = malloc (sizeof(struct process));
   t->self_process->pid = tid;
@@ -206,7 +206,6 @@ thread_create (const char *name, int priority,
   struct thread *cur = thread_current ();
   list_push_back (&cur->child_processes, &t->self_process->elem);
 #endif
-
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -291,11 +290,13 @@ thread_exit (void)
 {
   ASSERT (!intr_context ());
 
+  struct thread *cur = thread_current ();
+  printf("Thread %s exiting, printing backtrace:\n", cur->name);
+  debug_backtrace_all();
 #ifdef USERPROG
   process_free_children ();
   process_exit ();
   
-  struct thread *cur = thread_current ();
   lock_acquire (&cur->self_process_lock);
   if (cur->self_process != NULL)
     sema_up (&cur->self_process->exit_sema);

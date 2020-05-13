@@ -132,6 +132,7 @@ halt (void)
 void
 exit (int status)
 {
+  printf("Thread %s calling exit syscall with status %d\n", thread_current ()->name, status);
   thread_current ()->self_process->exit_status = status;
   thread_exit ();
 }
@@ -149,34 +150,7 @@ exec (const char *cmd_line)
 int
 wait (pid_t pid)
 {
-  struct list_elem *e;
-  struct process *child = NULL;
-        printf("A\n");
-  struct list children = thread_current ()->child_processes;
-  if (list_empty (&children)) return -1;
-        printf("B\n");
-  for (e = list_begin (&children); e != list_end (&children);
-    e = list_next (e))
-    {
-        printf("H\n");
-      struct process *child_process = list_entry (e, struct process, elem);
-      printf("Got process num %d, name %s\n", child_process->pid, child_process->self_thread->name);
-      if (child_process->pid == pid) 
-      {
-        child = child_process;
-        break;
-      }
-    }
-
-  if (child == NULL) return -1;
-  sema_down (&child->exit_sema);
-  
-  int status = child->exit_status;
-  // Removes this child process from the child list and frees its struct
-  list_remove (e);
-  free (child);
-
-  return status;
+    return process_wait (pid);
 }
 
 bool
