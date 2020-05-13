@@ -55,7 +55,11 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  int syscall = * (int *) f->esp;
+  void *esp = f->esp;
+  if (!is_valid_memory_range (esp, ARG_SIZE, false))
+    exit (-1);
+    
+  int syscall = * (int *) esp;
   call_syscall (f, syscall);
 }
 
@@ -374,5 +378,8 @@ is_valid_memory_range (const void *vaddr, size_t size, bool is_writable)
 static void*
 get_nth_syscall_arg (void *esp, int n)
 {
+  if (!is_valid_memory_range (esp + ARG_SIZE * n, ARG_SIZE, false))
+    exit (-1);
+
   return esp + ARG_SIZE * n;
 }
