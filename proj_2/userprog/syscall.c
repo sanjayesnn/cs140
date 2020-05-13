@@ -21,6 +21,8 @@
 #define CONSOLE_FD 1
 #define MAX_PUT_SIZE 200
 
+struct lock fs_lock;
+
 typedef int pid_t;
 
 static void syscall_handler (struct intr_frame *);
@@ -47,6 +49,7 @@ void
 syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+  lock_init (&fs_lock);
 }
 
 static void
@@ -170,7 +173,10 @@ create (const char *file, unsigned initial_size)
   if (!is_valid_memory_range (file, strlen (file) + 1, false))
     exit (-1);
 
-  return filesys_create (file, initial_size);
+  lock_acquire (&fs_lock);
+  bool result = filesys_create (file, initial_size);
+  lock_release (&fs_lock);
+  return result;
 }
 
 bool
@@ -179,7 +185,10 @@ remove (const char *file)
   if (!is_valid_memory_range (file, strlen (file) + 1, false))
     exit (-1);
 
-  return filesys_remove (file);
+  lock_acquire (&fs_lock);
+  bool result = filesys_remove (file);
+  lock_release (&fs_lock);
+  return result;
 }
 
 /* Gets the file_data struct for a given file descriptor. */
@@ -206,7 +215,9 @@ open (const char *file)
     exit (-1);
 
   struct thread *cur = thread_current ();
+  lock_acquire (&fs_lock);
   struct file *f = filesys_open (file);
+  lock_release (&fs_lock);
   if (f == NULL)
     return -1;
   
@@ -233,7 +244,10 @@ filesize (int fd)
   struct file_data *f = get_file_with_fd (fd);
   if (f == NULL) return -1; // TODO: what do we do when this fails?
 
-  return file_length (f->file_ptr); 
+  lock_acquire (&fs_lock);
+  int result = file_length (f->file_ptr); 
+  lock_release (&fs_lock);
+  return result;
 }
 
 int
@@ -257,7 +271,10 @@ read (int fd, void *buffer, unsigned size)
     {
       struct file_data *f = get_file_with_fd (fd);
       if (f == NULL) return -1; //TODO: what to do when this fails
-      return file_read (f->file_ptr, buffer, size); 
+      lock_acquire (&fs_lock);
+      int result = file_read (f->file_ptr, buffer, size); 
+      lock_release (&fs_lock);
+      return result;
     }
 }
 
@@ -280,7 +297,10 @@ write (int fd, const void *buffer, unsigned size)
     {
       struct file_data *f = get_file_with_fd (fd);
       if (f == NULL) return -1; //TODO: what to do when this fails
-      return file_write (f->file_ptr, buffer, size);
+      lock_acquire (&fs_lock);
+      int result = file_write (f->file_ptr, buffer, size);
+      lock_release (&fs_lock);
+      return result;
     }
 }
 
@@ -290,7 +310,9 @@ seek (int fd, unsigned position)
   struct file_data *f = get_file_with_fd (fd);
   if (f == NULL) return;
 
+  lock_acquire (&fs_lock);
   file_seek (f->file_ptr, position);
+  lock_release (&fs_lock);
 }
 
 unsigned
@@ -299,7 +321,10 @@ tell (int fd)
   struct file_data *f = get_file_with_fd (fd);
   if (f == NULL) return 0; // TODO: what do we do when this fails?
 
-  return file_tell (f->file_ptr);
+  lock_acquire (&fs_lock);
+  unsigned result = file_tell (f->file_ptr);
+  lock_release (&fs_lock);
+  return result;
 }
 
 void
@@ -309,7 +334,9 @@ close (int fd)
   if (f == NULL) 
     return;
   
+  lock_acquire (&fs_lock);
   file_close (f->file_ptr);
+  lock_release (&fs_lock);
   list_remove (&f->elem);
   free (f);
 }
