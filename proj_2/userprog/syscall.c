@@ -132,10 +132,19 @@ halt (void)
 void
 exit (int status)
 {
-  printf("Thread %s calling exit syscall with status %d\n", thread_current ()->name, status);
   struct thread *cur = thread_current ();
+  
+  char command[strlen(cur->name) + 1];
+  strlcpy (command, cur->name, strlen(cur->name) + 1);
+  const char tok[2] = " ";
+  char* ptr;
+  strtok_r (command, tok, &ptr);
+  printf ("%s: exit(%d)\n", command, status);
+  
   lock_acquire (&cur->self_process_lock);
-  thread_current ()->self_process->exit_status = status;
+  if (cur->self_process != NULL) {
+    cur->self_process->exit_status = status;
+  }
   lock_release (&cur->self_process_lock);
   thread_exit ();
 }
@@ -143,7 +152,6 @@ exit (int status)
 pid_t
 exec (const char *cmd_line)
 {
-    printf("EXEC\n");
   if (!is_valid_memory_range (cmd_line, strlen (cmd_line) + 1, false))
     exit (-1);
 

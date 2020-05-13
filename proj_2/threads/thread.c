@@ -164,7 +164,6 @@ tid_t
 thread_create (const char *name, int priority,
                thread_func *function, void *aux) 
 {
-    printf("CREATE THREAD\n");
   struct thread *t;
   struct kernel_thread_frame *kf;
   struct switch_entry_frame *ef;
@@ -291,8 +290,6 @@ thread_exit (void)
   ASSERT (!intr_context ());
 
   struct thread *cur = thread_current ();
-  printf("Thread %s exiting, printing backtrace:\n", cur->name);
-  debug_backtrace_all();
 #ifdef USERPROG
   process_free_children ();
   process_exit ();
@@ -307,8 +304,8 @@ thread_exit (void)
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
-  list_remove (&thread_current()->allelem);
-  thread_current ()->status = THREAD_DYING;
+  list_remove (&cur->allelem);
+  cur->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
 }

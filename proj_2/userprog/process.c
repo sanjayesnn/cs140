@@ -112,7 +112,6 @@ process_wait (tid_t child_tid)
   list_remove (e);
   free (child);
 
-  printf("Child returned with status %d\n", status);
 
   return status;
 }
@@ -497,6 +496,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
         return false;
 
       /* Load this page. */
+      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
           palloc_free_page (kpage);
           return false; 

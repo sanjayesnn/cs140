@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "userprog/exception.h"
 #include <inttypes.h>
 #include <stdio.h>
@@ -89,7 +91,6 @@ kill (struct intr_frame *f)
       printf ("%s: dying due to interrupt %#04x (%s).\n",
               thread_name (), f->vec_no, intr_name (f->vec_no));
       intr_dump_frame (f);
-      thread_exit (); 
 
     case SEL_KCSEG:
       /* Kernel's code segment, which indicates a kernel bug.
@@ -104,8 +105,18 @@ kill (struct intr_frame *f)
          kernel. */
       printf ("Interrupt %#04x (%s) in unknown segment %04x\n",
              f->vec_no, intr_name (f->vec_no), f->cs);
-      thread_exit ();
     }
+
+    struct thread *cur = thread_current ();
+
+    char command[strlen(cur->name) + 1];
+    strlcpy (command, cur->name, strlen(cur->name) + 1);
+    const char tok[2] = " ";
+    char* ptr;
+    strtok_r (command, tok, &ptr);
+    printf ("%s: exit(-1)\n", command);
+
+    thread_exit ();
 }
 
 /* Page fault handler.  This is a skeleton that must be filled in
