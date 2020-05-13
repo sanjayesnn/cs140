@@ -164,6 +164,19 @@ exec (const char *cmd_line)
   if (!is_valid_string_memory (cmd_line))
     exit (-1);
 
+  char filename[strlen(cmd_line) + 1];
+  strlcpy (filename, cmd_line, strlen(cmd_line) + 1);
+  const char tok[2] = " ";
+  char* ptr;
+  strtok_r (filename, tok, &ptr);
+
+  struct file *file = filesys_open (filename);
+  if (file == NULL)
+    {
+      printf ("load: %s: open failed\n", filename);
+      return -1;
+    }
+
   return process_execute(cmd_line);
 }
 
