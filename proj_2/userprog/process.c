@@ -276,7 +276,9 @@ load (const char *cmdline, void (**eip) (void), void **esp)
   process_activate ();
  
   /* Open executable file. */
+  acquire_fs_lock ();
   file = filesys_open (file_name);
+  release_fs_lock ();
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);

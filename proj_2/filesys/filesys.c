@@ -10,6 +10,9 @@
 /* Partition that contains the file system. */
 struct block *fs_device;
 
+/* Lock for file system. */
+struct lock fs_lock;
+
 static void do_format (void);
 
 /* Initializes the file system module.
@@ -18,6 +21,7 @@ void
 filesys_init (bool format) 
 {
   fs_device = block_get_role (BLOCK_FILESYS);
+  lock_init (&fs_lock);
   if (fs_device == NULL)
     PANIC ("No file system device found, can't initialize file system.");
 
@@ -100,4 +104,16 @@ do_format (void)
     PANIC ("root directory creation failed");
   free_map_close ();
   printf ("done.\n");
+}
+
+void 
+acquire_fs_lock (void)
+{
+  lock_acquire (&fs_lock);
+}
+
+void 
+release_fs_lock (void)
+{
+  lock_release (&fs_lock);
 }
