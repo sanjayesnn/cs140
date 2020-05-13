@@ -133,7 +133,10 @@ void
 exit (int status)
 {
   printf("Thread %s calling exit syscall with status %d\n", thread_current ()->name, status);
+  struct thread *cur = thread_current ();
+  lock_acquire (&cur->self_process_lock);
   thread_current ()->self_process->exit_status = status;
+  lock_release (&cur->self_process_lock);
   thread_exit ();
 }
 
