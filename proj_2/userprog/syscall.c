@@ -319,6 +319,9 @@ close (int fd)
 static bool
 is_valid_memory_range (const void *vaddr, size_t size, bool is_writable) 
 {
+  if (vaddr == NULL)
+    return false;
+
   /* Start at the beginning of the page. */
   void *upage = pg_round_down (vaddr);
   /* Check every page in the given range. */
@@ -328,6 +331,8 @@ is_valid_memory_range (const void *vaddr, size_t size, bool is_writable)
         return false;
 
       uint32_t *pte = lookup_page (thread_current ()->pagedir, upage, false);
+      if (pte == NULL)
+        return false;
       /* Page is writable. */
       if (is_writable && (*pte & PTE_W) == 0)
         return false;
