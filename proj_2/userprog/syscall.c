@@ -161,7 +161,7 @@ exit (int status)
 pid_t
 exec (const char *cmd_line)
 {
-  if (is_valid_string_memory (cmd_line))
+  if (!is_valid_string_memory (cmd_line))
     exit (-1);
 
   return process_execute(cmd_line);
@@ -176,7 +176,7 @@ wait (pid_t pid)
 bool
 create (const char *file, unsigned initial_size)
 {
-  if (is_valid_string_memory (file))
+  if (!is_valid_string_memory (file))
     exit (-1);
 
   lock_acquire (&fs_lock);
@@ -188,7 +188,7 @@ create (const char *file, unsigned initial_size)
 bool
 remove (const char *file)
 {
-  if (is_valid_string_memory (file))
+  if (!is_valid_string_memory (file))
     exit (-1);
 
   lock_acquire (&fs_lock);
@@ -217,7 +217,7 @@ get_file_with_fd (int fd)
 int
 open (const char *file)
 {
-  if (is_valid_string_memory (file))
+  if (!is_valid_string_memory (file))
     exit (-1);
 
   struct thread *cur = thread_current ();
@@ -347,6 +347,7 @@ close (int fd)
   free (f);
 }
 
+/* Determines whether the supplied pointer references a valid string. */
 static bool
 is_valid_string_memory (const void *vaddr) 
 {
@@ -371,7 +372,7 @@ is_valid_string_memory (const void *vaddr)
         {
           if (*cur == '\0')
             return true;
-
+          
           cur++;
         }
       upage = (char *) upage + PGSIZE;
