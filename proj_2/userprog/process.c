@@ -32,6 +32,9 @@ process_execute (const char *cmdline)
   char *cmd_copy;
   tid_t tid;
 
+  if (cmdline == NULL || strlen(cmdline) > PGSIZE)
+      return TID_ERROR;
+
   /* Make a copy of CMDLINE.
      Otherwise there's a race between the caller and load(). */
   cmd_copy = palloc_get_page (0);
