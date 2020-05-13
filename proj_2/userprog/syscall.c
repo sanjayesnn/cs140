@@ -139,7 +139,7 @@ exit (int status)
   const char tok[2] = " ";
   char* ptr;
   strtok_r (command, tok, &ptr);
-  printf ("%s: exit(%d)\n", command, status);
+  printf ("%s: exit(%d)\n", command, status < 0 ? -1 : status);
   
   lock_acquire (&cur->self_process_lock);
   if (cur->self_process != NULL) {
