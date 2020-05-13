@@ -11,6 +11,7 @@ typedef int pid_t;
 struct process
   {
     pid_t pid;
+    bool loaded;
     int exit_status;
     struct semaphore exit_sema;
     struct thread *self_thread;

@@ -22,6 +22,25 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+/* Returns a child thread by tid. Returns NULL if not found. */
+struct process *get_process_by_tid (tid_t tid) {
+  struct list_elem *e;
+  struct process *child = NULL;
+  if (list_empty (&thread_current ()->child_processes)) return NULL;
+  for (e = list_begin (&thread_current ()->child_processes); 
+      e != list_end (&thread_current ()->child_processes);
+      e = list_next (e))
+    {
+      struct process *child_process = list_entry (e, struct process, elem);      
+      if (child_process->pid == tid)
+      {
+        child = child_process;
+        break;
+      }
+    }
+  return child;
+}
+
 /* Starts a new thread running a user program loaded from
    CMDLINE.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -46,6 +65,17 @@ process_execute (const char *cmdline)
   tid = thread_create (cmdline, PRI_DEFAULT, start_process, cmd_copy);
   if (tid == TID_ERROR)
     palloc_free_page (cmd_copy); 
+
+  /* Waits for the newly created thread to see if it loaded */
+  struct process *child_process = get_process_by_tid (tid);
+  if (child_process == NULL) return -1;
+  sema_down (&child_process->exit_sema); 
+  if (!child_process->loaded) {
+    list_remove (&child_process->elem);
+    free (child_process);
+    return -1;
+  }
+
   return tid;
 }
 
@@ -70,6 +100,11 @@ start_process (void *cmdline_)
   if (!success) 
     thread_exit ();
 
+  /* Informs the parent that this process has been loaded successfully */
+  struct thread *cur = thread_current ();
+  cur->self_process->loaded = true;
+  sema_up (&cur->self_process->exit_sema);
+
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -83,36 +118,20 @@ start_process (void *cmdline_)
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
    exception), returns -1.  If TID is invalid or if it was not a
-   child of the calling process, or if process_wait() has already
-   been successfully called for the given TID, returns -1
-   immediately, without waiting.
 
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
 process_wait (tid_t child_tid) 
 {
-  struct list_elem *e;
-  struct process *child = NULL;
-  if (list_empty (&thread_current ()->child_processes)) return -1;
-  for (e = list_begin (&thread_current ()->child_processes); 
-      e != list_end (&thread_current ()->child_processes);
-      e = list_next (e))
-    {
-      struct process *child_process = list_entry (e, struct process, elem);      
-      if (child_process->pid == child_tid)
-      {
-        child = child_process;
-        break;
-      }
-    }
+  struct process *child = get_process_by_tid (child_tid);
 
   if (child == NULL) return -1;
   sema_down (&child->exit_sema);
 
   int status = child->exit_status;
   // Removes this child process from the child list and frees its struct
-  list_remove (e);
+  list_remove (&child->elem);
   free (child);
 
 
@@ -586,3 +605,6 @@ process_free_children (void)
       cur_elem = next;
     }
 }
+#include "userprog/process.h"
+#include <debug.h>
+#include <inttypes.h>

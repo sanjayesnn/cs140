@@ -200,6 +200,7 @@ thread_create (const char *name, int priority,
   t->self_process = malloc (sizeof(struct process));
   t->self_process->pid = tid;
   t->self_process->exit_status = -1;
+  t->self_process->loaded = false;
   t->self_process->self_thread = t;
   sema_init (&t->self_process->exit_sema, 0);
   
