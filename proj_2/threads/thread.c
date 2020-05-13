@@ -4,6 +4,7 @@
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
+#include "filesys/file.h"
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -298,6 +299,18 @@ thread_exit (void)
   if (cur->self_process != NULL)
     sema_up (&cur->self_process->exit_sema);
   lock_release (&cur->self_process_lock);
+  file_close (cur->self_file_executable);
+
+  struct list_elem *cur_elem = list_begin (&cur->open_files);
+  struct list_elem *end_elem = list_end (&cur->open_files);
+  while (cur_elem != end_elem)
+    {
+      struct file_data *f = list_entry (cur_elem, struct file_data, elem);
+      struct list_elem *next = list_next (cur_elem);   
+      file_close (f->file_ptr);
+      free (f);
+      cur_elem = next;
+    }
 #endif
 
   /* Remove thread from all threads list, set our status to dying,

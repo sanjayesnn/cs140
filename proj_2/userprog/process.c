@@ -91,10 +91,10 @@ process_wait (tid_t child_tid)
 {
   struct list_elem *e;
   struct process *child = NULL;
-  struct list children = thread_current ()->child_processes;
-  if (list_empty (&children)) return -1;
-  for (e = list_begin (&children); e != list_end (&children);
-    e = list_next (e))
+  if (list_empty (&thread_current ()->child_processes)) return -1;
+  for (e = list_begin (&thread_current ()->child_processes); 
+      e != list_end (&thread_current ()->child_processes);
+      e = list_next (e))
     {
       struct process *child_process = list_entry (e, struct process, elem);      
       if (child_process->pid == child_tid)
@@ -282,6 +282,8 @@ load (const char *cmdline, void (**eip) (void), void **esp)
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
+  t->self_file_executable = file;
+  file_deny_write (file);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -407,7 +409,6 @@ load (const char *cmdline, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
   return success;
 }
 

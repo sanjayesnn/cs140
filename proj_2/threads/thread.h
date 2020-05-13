@@ -110,6 +110,7 @@ struct thread
     struct list child_processes;        /* List of child processes. */
     struct process *self_process;       /* Own process struct. */
     struct lock self_process_lock;      /* Lock for accessing process data. */
+    struct file *self_file_executable;  /* File pointer to open exectuable. */
 #endif
 
     /* Owned by thread.c. */
