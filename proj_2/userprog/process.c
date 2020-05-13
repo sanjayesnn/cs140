@@ -263,6 +263,7 @@ load (const char *cmdline, void (**eip) (void), void **esp)
   args[0] = file_name;
   for (size_t i=1; i<num_args; i++) {
       strtok_r(args[i-1], tok, &(args[i]));
+      while (*(args[i]) == ' ') args[i]++;
   } 
 
   /* Initializes an array for the argument pointers */
