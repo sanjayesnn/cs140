@@ -595,12 +595,18 @@ process_free_children (void)
       struct process *cur_child = list_entry (cur_elem, struct process, elem);
       struct thread *cur_child_thread = cur_child->self_thread;
       struct list_elem *next = list_next (cur_elem);
+      
+      if (cur_child_thread != NULL)
+        lock_acquire (&cur_child_thread->self_process_lock);
 
-      lock_acquire (&cur_child_thread->self_process_lock);
       list_remove (cur_elem);
       free (cur_child);
-      cur_child_thread->self_process = NULL;
-      lock_release (&cur_child_thread->self_process_lock);
+
+      if (cur_child_thread != NULL)
+        {
+          cur_child_thread->self_process = NULL;
+          lock_release (&cur_child_thread->self_process_lock);
+        }
 
       cur_elem = next;
     }
