@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "filesys/off_t.h"
 #include "threads/synch.h"
+#include "threads/thread.h"
 
 /* Sectors of system file inodes. */
 #define FREE_MAP_SECTOR 0       /* Free map file inode sector. */
@@ -19,5 +20,6 @@ struct file *filesys_open (const char *name);
 bool filesys_remove (const char *name);
 void acquire_fs_lock (void);
 void release_fs_lock (void);
+struct thread *fs_lock_holder (void);
 
 #endif /* filesys/filesys.h */

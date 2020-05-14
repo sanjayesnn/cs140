@@ -151,7 +151,7 @@ exit (int status)
   lock_acquire (&cur->self_process_lock);
   if (cur->self_process != NULL) 
     cur->self_process->exit_status = status;
-    
+
   lock_release (&cur->self_process_lock);
   thread_exit ();
 }

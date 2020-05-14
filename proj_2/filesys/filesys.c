@@ -117,3 +117,9 @@ release_fs_lock (void)
 {
   lock_release (&fs_lock);
 }
+
+struct thread *
+fs_lock_holder (void)
+{
+  return fs_lock.holder;
+}
