@@ -23,8 +23,6 @@
 #define CONSOLE_FD 1
 #define MAX_PUT_SIZE 200
 
-typedef int pid_t;
-
 static void syscall_handler (struct intr_frame *);
 static bool is_valid_string_memory (const void *vaddr);
 static bool is_valid_memory_range (const void *vaddr, size_t size, bool is_writable);
