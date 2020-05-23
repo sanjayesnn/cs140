@@ -23,8 +23,6 @@
 #define CONSOLE_FD 1
 #define MAX_PUT_SIZE 200
 
-typedef int pid_t;
-
 static void syscall_handler (struct intr_frame *);
 static bool is_valid_string_memory (const void *vaddr);
 static bool is_valid_memory_range (const void *vaddr, size_t size, bool is_writable);
@@ -149,9 +147,9 @@ exit (int status)
   printf ("%s: exit(%d)\n", command, status < 0 ? -1 : status);
   
   lock_acquire (&cur->self_process_lock);
-  if (cur->self_process != NULL) {
+  if (cur->self_process != NULL) 
     cur->self_process->exit_status = status;
-  }
+
   lock_release (&cur->self_process_lock);
   thread_exit ();
 }
@@ -261,7 +259,8 @@ int
 filesize (int fd)
 {
   struct file_data *f = get_file_with_fd (fd);
-  if (f == NULL) return -1; // TODO: what do we do when this fails?
+  if (f == NULL) 
+    return -1;
 
   acquire_fs_lock ();
   int result = file_length (f->file_ptr); 
@@ -289,7 +288,8 @@ read (int fd, void *buffer, unsigned size)
   else
     {
       struct file_data *f = get_file_with_fd (fd);
-      if (f == NULL) return -1; //TODO: what to do when this fails
+      if (f == NULL) 
+        return -1;
       acquire_fs_lock ();
       int result = file_read (f->file_ptr, buffer, size); 
       release_fs_lock ();
@@ -315,7 +315,8 @@ write (int fd, const void *buffer, unsigned size)
   else
     {
       struct file_data *f = get_file_with_fd (fd);
-      if (f == NULL) return -1; //TODO: what to do when this fails
+      if (f == NULL) 
+        return 0; 
       acquire_fs_lock ();
       int result = file_write (f->file_ptr, buffer, size);
       release_fs_lock ();
@@ -327,7 +328,8 @@ void
 seek (int fd, unsigned position)
 {
   struct file_data *f = get_file_with_fd (fd);
-  if (f == NULL) return;
+  if (f == NULL) 
+    return;
 
   acquire_fs_lock ();
   file_seek (f->file_ptr, position);
@@ -338,7 +340,8 @@ unsigned
 tell (int fd)
 {
   struct file_data *f = get_file_with_fd (fd);
-  if (f == NULL) return 0; // TODO: what do we do when this fails?
+  if (f == NULL) 
+    return 0;
 
   acquire_fs_lock ();
   unsigned result = file_tell (f->file_ptr);

@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "filesys/file.h"
+#include "filesys/filesys.h"
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -298,10 +299,17 @@ thread_exit (void)
   
   lock_acquire (&cur->self_process_lock);
   if (cur->self_process != NULL)
-    sema_up (&cur->self_process->exit_sema);
+    {
+      /* Set self_thread to be null, to prevent parent referencing freed data. */
+      cur->self_process->self_thread = NULL;
+      
+      /* Let parent know that child has  finished */
+      sema_up (&cur->self_process->exit_sema);
+    }
   lock_release (&cur->self_process_lock);
   file_close (cur->self_file_executable);
 
+  /* Close all open files. */
   struct list_elem *cur_elem = list_begin (&cur->open_files);
   struct list_elem *end_elem = list_end (&cur->open_files);
   while (cur_elem != end_elem)
@@ -312,6 +320,10 @@ thread_exit (void)
       free (f);
       cur_elem = next;
     }
+  
+  /* Release fs_lock if this thread is holding it. */
+  if (cur == fs_lock_holder ())
+    release_fs_lock ();
 #endif
 
   /* Remove thread from all threads list, set our status to dying,
