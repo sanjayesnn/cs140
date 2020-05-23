@@ -22,9 +22,11 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+struct process *get_process_by_tid (tid_t tid);
 
 /* Returns a child thread by tid. Returns NULL if not found. */
-struct process *get_process_by_tid (tid_t tid) {
+struct process *
+get_process_by_tid (tid_t tid) {
   struct list_elem *e;
   struct process *child = NULL;
   if (list_empty (&thread_current ()->child_processes)) return NULL;
