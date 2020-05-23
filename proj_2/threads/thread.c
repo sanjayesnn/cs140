@@ -14,6 +14,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "vm/page.h"
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -208,6 +209,10 @@ thread_create (const char *name, int priority,
   struct thread *cur = thread_current ();
   list_push_back (&cur->child_processes, &t->self_process->elem);
 #endif
+
+#ifdef VM
+  spt_init (&t->spt);
+#endif
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -324,6 +329,10 @@ thread_exit (void)
   /* Release fs_lock if this thread is holding it. */
   if (cur == fs_lock_holder ())
     release_fs_lock ();
+#endif
+
+#ifdef VM
+  spt_free (&cur->spt);
 #endif
 
   /* Remove thread from all threads list, set our status to dying,

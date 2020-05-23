@@ -3,6 +3,7 @@
 
 #include <debug.h>
 #include <list.h>
+#include <hash.h>
 #include <stdint.h>
 #include "threads/synch.h"
 #include "userprog/process.h"
@@ -111,6 +112,10 @@ struct thread
     struct process *self_process;       /* Own process struct. */
     struct lock self_process_lock;      /* Lock for accessing process data. */
     struct file *self_file_executable;  /* File pointer to open exectuable. */
+#endif
+
+#ifdef VM
+    struct hash spt;
 #endif
 
     /* Owned by thread.c. */
