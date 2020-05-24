@@ -13,8 +13,8 @@ unsigned
 hash_func (const struct hash_elem *e, void *aux UNUSED)
 {
   struct spt_elem *spt_entry = hash_entry (e, struct spt_elem, elem);
-  void *vaddr = spt_entry->vaddr;
-  return hash_bytes (&vaddr, sizeof (vaddr));
+  void *upage = spt_entry->upage;
+  return hash_bytes (&upage, sizeof (upage));
 }
 
 bool
@@ -24,7 +24,7 @@ hash_less (const struct hash_elem *a,
 {
   struct spt_elem *a_entry = hash_entry (a, struct spt_elem, elem);
   struct spt_elem *b_entry = hash_entry (b, struct spt_elem, elem);
-  return a_entry->vaddr < b_entry->vaddr;
+  return a_entry->upage < b_entry->upage;
 }
 
 void
@@ -40,13 +40,13 @@ spt_init (struct hash *spt)
 }
 
 void
-spt_add_page (struct hash *spt, void *vaddr)
+spt_add_page (struct hash *spt, void *upage, bool writable)
 {
   struct spt_elem *entry = malloc (sizeof (struct spt_elem));
   entry->status = IN_MEMORY;
   lock_init (&entry->spt_elem_lock);
-  entry->vaddr = vaddr;
-  entry->location = vaddr;
+  entry->upage = upage;
+  entry->writable = writable;
   hash_insert (spt, &entry->elem);
 }
 
@@ -64,14 +64,14 @@ spt_free (struct hash *spt)
 }
 
 /*
- * Returns the page element corresponding to vaddr
+ * Returns the page element corresponding to upage
  * Returns NULL if nothing found
  */
 struct spt_elem*
-spt_get_page (struct hash *spt, void *vaddr)
+spt_get_page (struct hash *spt, void *upage)
 {
   struct spt_elem mock_entry;
-  mock_entry.vaddr = vaddr;
+  mock_entry.upage = upage;
   struct hash_elem *res = hash_find (spt, &mock_entry.elem);
   if (res == NULL) return NULL;
   return hash_entry (res,

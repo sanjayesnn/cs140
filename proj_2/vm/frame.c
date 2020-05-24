@@ -7,7 +7,9 @@
 #include "threads/synch.h"
 #include "threads/thread.h"
 #include "userprog/pagedir.h"
+#include "userprog/process.h" /* For install_page */
 #include "vm/page.h"
+#include "vm/swap.h"
 
 struct list frame_table;
 struct frame_table_elem *clock_hand; /* Position of "hand" for clock alg. */
@@ -21,7 +23,6 @@ struct frame_table_elem
   {
     struct thread *holder;          /* Thread owning page in frame. */
     struct spt_elem *page_data;     /* SPT entry for page in frame. */
-    void *upage;                    /* Ptr to user vaddr for page in frame. */
     void *kpage;                    /* Ptr to kernel vaddr for page. */
     struct list_elem elem;
   };
@@ -73,31 +74,35 @@ ft_evict_page (void)
   while (true) 
   {
     // Check clock_hand for reference and dirty bit
-    void *page = clock_hand->kpage; // TODO: use upage instead of kpage???
+    void *upage = clock_hand->page_data->upage;
     struct thread *t = clock_hand->holder;
     uint32_t *pd = t->pagedir;
-    if (pagedir_is_accessed (pd, page)) 
+    if (pagedir_is_accessed (pd, upage)) 
       {
-        pagedir_set_accessed (pd, page, false);
+        pagedir_set_accessed (pd, upage, false);
       } 
     else 
       {
         // Evicting the page at clock hand
-        if (!pagedir_is_dirty (pd, page))
+        if (!pagedir_is_dirty (pd, upage))
           {
             PANIC ("Removing unmodified page failed"); // TODO: implement file mapping
           }
         else 
           {
             /* Not accessed, is dirty */
-            // TODO: actually copy to swap
-            void *new_location = NULL; // TODO: get address from swap
+            void *kpage = clock_hand->kpage;
+
             struct spt_elem *spte = clock_hand->page_data;
+            /* Writes data to swap */
+            // TODO: make sure that the data is not being accessed right now
+            block_sector_t new_swap_sector = swap_write (kpage);
+            
             lock_acquire (&spte->spt_elem_lock);
-            spte->location = new_location;
+            spte->swap_sector = new_swap_sector;
             spte->status = IN_SWAP;
             lock_release (&spte->spt_elem_lock);
-            palloc_free_page (page);
+            palloc_free_page (kpage);
           }
         // Removes the current frame table elem and increments clock hand
         struct frame_table_elem *clock_hand_cp = clock_hand;
@@ -111,55 +116,70 @@ ft_evict_page (void)
   }
 }
 
-void
-vm_page_in (void *vaddr) 
+/*
+ * Returns false if upage not found
+ * TODO: check synchronization
+ */
+bool
+vm_page_in (void *upage) 
 {
   struct hash *spt = &thread_current ()->spt;
-  struct spt_elem *page = spt_get_page (spt, vaddr);
-  if (page == NULL) PANIC ("No page to page in\n");
+  struct spt_elem *page = spt_get_page (spt, upage);
+  if (page == NULL) {
+     printf ("No page to page in\n");
+     return false;
+  }
+  if (page->status != IN_SWAP) PANIC ("Page not in swap\n"); // TODO
 
   /* Gets an empty frame */
-  // TODO: make sure that virtual addresses line up
-  // and that no new supplemental page table entry is created
-  void *frame = vm_get_frame (PAL_USER);
+  void *kpage = vm_get_frame (PAL_USER, upage, page->writable);
 
-  /* Fetches the page from memory */
-  // TODO: Get data from swap
+  /* Fetches the page from swap */
+  block_sector_t start_sector = page->swap_sector;
+  swap_read (kpage, start_sector);
+
+  /* Adds a mapping from upage to kpage */
+  install_page (upage, kpage, page->writable);
 
   /* Does bookkeeping */ 
   lock_acquire (&page->spt_elem_lock);
-  page->location = frame;
   page->status = IN_MEMORY;
   lock_release (&page->spt_elem_lock);
+  return true;
 }
 
 
 void *
-vm_get_frame (enum palloc_flags flags) 
+vm_get_frame (enum palloc_flags flags, void *upage, bool writable) 
 {
-  void *page = palloc_get_page (flags);
-  if (page == NULL)
+  void *kpage = palloc_get_page (flags);
+  if (kpage == NULL)
     {
       ft_evict_page ();
-      page = palloc_get_page (flags);
-      if (page == NULL)
+      kpage = palloc_get_page (flags);
+      if (kpage == NULL)
           PANIC ("No frame found even after evicting\n"); // TODO
     }
     
   struct thread *cur = thread_current ();
-  spt_add_page (&cur->spt, page);
-  struct frame_table_elem *new_entry = 
-        malloc (sizeof (struct frame_table_elem));
-  new_entry->holder = cur;
-  new_entry->page_data = spt_get_page (&cur->spt, page);
-  new_entry->upage = NULL; //TODO - how to calculate this?
-  new_entry->kpage = page;
-  lock_acquire (&frame_table_lock);
-  list_push_back (&frame_table, &new_entry->elem);
-  if (clock_hand == NULL)
-    clock_hand = new_entry;
-  lock_release (&frame_table_lock);
-  return page;
+  
+  if (spt_get_page (&cur->spt, upage) == NULL) 
+    {
+      /* Creates a new supplemental page table entry for this page */ 
+  
+      spt_add_page (&cur->spt, upage, writable);
+      struct frame_table_elem *new_entry = 
+            malloc (sizeof (struct frame_table_elem));
+      new_entry->holder = cur;
+      new_entry->page_data = spt_get_page (&cur->spt, upage);
+      new_entry->kpage = kpage;
+      lock_acquire (&frame_table_lock);
+      list_push_back (&frame_table, &new_entry->elem);
+      if (clock_hand == NULL)
+        clock_hand = new_entry;
+      lock_release (&frame_table_lock);
+    }
+  return kpage;
 }
 
 struct frame_table_elem*
@@ -172,21 +192,21 @@ ft_find_frame (void *upage)
       struct frame_table_elem *cur = list_entry (e,
                                                  struct frame_table_elem,
                                                  elem);
-      if (cur->upage == upage)
+      if (cur->page_data->upage == upage)
         return upage;
     }
   return NULL;
 }
 
 void 
-vm_free_frame (void *page) 
+vm_free_frame (void *kpage) 
 {
-  struct frame_table_elem *fte = ft_find_frame (page);
+  struct frame_table_elem *fte = ft_find_frame (kpage);
   lock_acquire (&frame_table_lock);
   list_remove (&fte->elem);
   lock_release (&frame_table_lock);
   struct thread* cur = thread_current ();
   spt_remove_page (&cur->spt, fte->page_data);
   free (fte);
-  palloc_free_page (page);
+  palloc_free_page (kpage);
 }

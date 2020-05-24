@@ -441,7 +441,6 @@ load (const char *cmdline, void (**eip) (void), void **esp)
 
 /* load() helpers. */
 
-static bool install_page (void *upage, void *kpage, bool writable);
 
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
@@ -520,7 +519,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      uint8_t *kpage = vm_get_frame (PAL_USER);
+      uint8_t *kpage = vm_get_frame (PAL_USER, upage, writable);
       if (kpage == NULL)
         return false;
 
@@ -555,7 +554,7 @@ setup_stack (void **esp)
   uint8_t *kpage;
   bool success = false;
 
-  kpage = vm_get_frame (PAL_USER | PAL_ZERO);
+  kpage = vm_get_frame (PAL_USER | PAL_ZERO, ((uint8_t *) PHYS_BASE) - PGSIZE, true);
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
@@ -563,7 +562,7 @@ setup_stack (void **esp)
         *esp = PHYS_BASE;
       }
       else
-        vm_free_frame (kpage);  
+        vm_free_frame (kpage);
     }
   return success;
 }
@@ -577,7 +576,7 @@ setup_stack (void **esp)
    with palloc_get_page().
    Returns true on success, false if UPAGE is already mapped or
    if memory allocation fails. */
-static bool
+bool
 install_page (void *upage, void *kpage, bool writable)
 {
   struct thread *t = thread_current ();
