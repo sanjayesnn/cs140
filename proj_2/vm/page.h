@@ -3,6 +3,8 @@
 
 #include <hash.h>
 #include <stdbool.h>
+#include "filesys/file.h"
+
 #include "threads/synch.h"
 #include "devices/block.h"
 
@@ -21,6 +23,10 @@ struct spt_elem
     struct lock spt_elem_lock;
     struct hash_elem elem;
     bool writable;
+
+    off_t offset;
+    uint32_t zero_bytes;
+    struct file *file;
   };
 
 void spt_init (struct hash* spt);
