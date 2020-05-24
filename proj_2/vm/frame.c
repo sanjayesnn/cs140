@@ -1,5 +1,6 @@
 #include "vm/frame.h"
 
+#include <list.h>
 #include "threads/malloc.h"
 #include "threads/palloc.h"
 #include "threads/synch.h"
@@ -10,7 +11,7 @@ struct list frame_table;
 struct frame_table_elem *clock_hand; /* Position of "hand" for clock alg. */
 struct lock frame_table_lock;
 
-struct frame_table_entry* ft_find_frame (void *upage);
+struct frame_table_elem* ft_find_frame (void *upage);
 
 
 struct frame_table_elem
@@ -33,14 +34,14 @@ ft_init (void)
 void
 ft_destruct (void)
 {
-  for (list_elem *e = list_begin (&frame_table);
+  for (struct list_elem *e = list_begin (&frame_table);
           e != list_end (&frame_table);
-          e = list_next (&frame_table, e))
+          e = list_next (e))
     {
       struct frame_table_elem *cur = list_entry (e,
                                                  struct frame_table_elem,
                                                  elem);
-      list_remove (&frame_table, &cur);
+      list_remove (e);
       free (cur);
     }
 }
@@ -71,12 +72,12 @@ vm_get_frame (enum palloc_flags flags)
   return page;
 }
 
-struct frame_table_entry*
+struct frame_table_elem*
 ft_find_frame (void *upage)
 {
-  for (list_elem *e = list_begin (&frame_table);
+  for (struct list_elem *e = list_begin (&frame_table);
           e != list_end (&frame_table);
-          e = list_next (&frame_table, e))
+          e = list_next (e))
     {
       struct frame_table_elem *cur = list_entry (e,
                                                  struct frame_table_elem,
@@ -90,9 +91,9 @@ ft_find_frame (void *upage)
 void 
 vm_free_frame (void *page) 
 {
-  struct frame_table_entry *fte = ft_find_frame (page);
+  struct frame_table_elem *fte = ft_find_frame (page);
   lock_acquire (&frame_table_lock);
-  list_remove (&frame_table, &fte->elem);
+  list_remove (&fte->elem);
   lock_release (&frame_table_lock);
   struct thread* cur = thread_current ();
   spt_remove_page (&cur->spt, fte->page_data);
