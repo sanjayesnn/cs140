@@ -63,12 +63,18 @@ spt_free (struct hash *spt)
   hash_destroy (spt, hash_free_elem);
 }
 
+/*
+ * Returns the page element corresponding to vaddr
+ * Returns NULL if nothing found
+ */
 struct spt_elem*
 spt_get_page (struct hash *spt, void *vaddr)
 {
   struct spt_elem mock_entry;
   mock_entry.vaddr = vaddr;
-  return hash_entry (hash_find (spt, &mock_entry.elem),
+  struct hash_elem *res = hash_find (spt, &mock_entry.elem);
+  if (res == NULL) return NULL;
+  return hash_entry (res,
                      struct spt_elem,
                      elem);
 }
