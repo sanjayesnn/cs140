@@ -180,6 +180,7 @@ vm_page_in (void *upage)
 void *
 vm_get_frame (enum palloc_flags flags, void *upage, bool writable) 
 {
+    printf("Creating new frame with upage %x\n", upage);
   void *kpage = palloc_get_page (flags);
   if (kpage == NULL)
     {

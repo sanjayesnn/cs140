@@ -166,6 +166,7 @@ page_fault (struct intr_frame *f)
     {
       /* Tries to page in */
       void *upage = pg_round_down (f->eip);
+      printf("Page fault happened at %x. Paging in page at %x\n", f->eip, upage);
       if (vm_page_in (upage)) return;
     }
 
