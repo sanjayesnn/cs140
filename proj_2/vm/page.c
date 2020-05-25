@@ -1,4 +1,6 @@
 #include "vm/page.h"
+
+#include <stdio.h>
 #include "threads/malloc.h"
 
 
@@ -43,6 +45,7 @@ void
 spt_add_page (struct hash *spt, void *upage, bool writable)
 {
   struct spt_elem *entry = malloc (sizeof (struct spt_elem));
+  printf("Adding page with upage %x\n", upage);
   entry->status = IN_MEMORY;
   lock_init (&entry->spt_elem_lock);
   entry->upage = upage;

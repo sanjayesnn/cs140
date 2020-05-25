@@ -24,7 +24,7 @@ struct spt_elem
     struct hash_elem elem;
     bool writable;
 
-    off_t offset;
+    off_t ofs;
     uint32_t zero_bytes;
     struct file *file;
   };
