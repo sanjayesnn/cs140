@@ -478,7 +478,7 @@ munmap (mapid_t mapping)
       void *addr = (char *)mf->upage + page_num * PGSIZE;
       struct spt_elem *spte = spt_get_page (&cur->spt, addr);
       if (spte != NULL)
-        vm_free_page (spte);;
+        vm_free_page (spte);
     }
   
   free (mf);
