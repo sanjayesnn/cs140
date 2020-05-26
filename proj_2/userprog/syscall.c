@@ -16,12 +16,15 @@
 #include "devices/input.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "vm/page.h"
 
 /* Each syscall argument takes up 4 bytes on the stack. */
 #define ARG_SIZE 4
 #define INPUT_FD 0
 #define CONSOLE_FD 1
 #define MAX_PUT_SIZE 200
+
+typedef int mapid_t;
 
 static void syscall_handler (struct intr_frame *);
 static bool is_valid_string_memory (const void *vaddr);
@@ -43,6 +46,8 @@ int write (int fd, const void *buffer, unsigned size);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
+mapid_t mmap (int fd, void *addr);
+void munmap (mapid_t mapping);
 
 void
 syscall_init (void) 
@@ -122,6 +127,15 @@ call_syscall (struct intr_frame *f, int syscall)
       case SYS_CLOSE : ;
         fd = * (int *) get_nth_syscall_arg (f->esp, 1);
         close (fd);
+        break;
+      case SYS_MMAP : ;
+        fd = * (int *) get_nth_syscall_arg (f->esp, 1);
+        void *addr = * (void **) get_nth_syscall_arg (f->esp, 2);
+        f->eax = mmap (fd, addr);
+        break;
+      case SYS_MUNMAP : ;
+        mapid_t mapping = * (mapid_t *) get_nth_syscall_arg (f->esp, 1);
+        munmap (mapping);
         break;
       default : ;
         exit (-1);
@@ -361,6 +375,79 @@ close (int fd)
   release_fs_lock ();
   list_remove (&f->elem);
   free (f);
+}
+
+mapid_t
+mmap (int fd, void *addr)
+{
+  // TODO: figure out how to validate memory
+
+  if (addr == 0x0 || pg_ofs (addr) != 0)
+    return -1;
+
+  struct file_data *f = get_file_with_fd (fd);
+  int file_len = file_length (f->file_ptr);
+  if (f == NULL || file_len <= 0) 
+    return -1;
+
+  /* Ensure memory doesn't overlaps any existing set of mapped pages. */
+  void *upage = addr;
+  struct thread *cur = thread_current ();
+  while ((char *) upage < (char *) addr + file_len)
+    {
+      if (upage == NULL || !is_user_vaddr (upage))
+        return -1;
+      struct spt_elem *spte = spt_get_page (&cur->spt, upage);
+      /* Page already mapped. */
+      if (spte != NULL)
+        return -1;
+      
+      upage = (char *) upage + PGSIZE;
+    }
+
+  struct file *reopened_file = file_reopen (f->file_ptr);
+
+  if (reopened_file == NULL)
+    return -1;
+
+  struct mmap_file *mf = malloc (sizeof (struct mmap_file));
+  if (mf == NULL)
+    return -1;
+
+  mf->map_id = cur->next_mapping_id;
+  cur->next_mapping_id++;
+  mf->file = reopened_file;
+  mf->upage = addr;
+
+  /* Create entries in supplementary page table. */
+  off_t ofs = 0;
+  int num_pages = 0;
+  uint32_t zero_bytes = 0;
+  for (ofs = 0; ofs < file_len; ofs += PGSIZE)
+    {
+      bool writable = is_file_writable (f->file_ptr);
+      zero_bytes = (ofs + PGSIZE >= file_len) ? PGSIZE + ofs - file_len : 0;
+      
+      spt_add_page (&cur->spt, (char *)addr + ofs, writable, true);
+      struct spt_elem *new_page = spt_get_page (&cur->spt, upage);
+      if (new_page == NULL)
+        return -1;
+      new_page->zero_bytes = PGSIZE - zero_bytes;
+      new_page->file = reopened_file;
+      new_page->ofs = ofs;
+
+      num_pages++;
+    }
+
+  mf->num_pages = num_pages;
+  list_push_back (&cur->mmap_list, &mf->elem);
+  return mf->map_id;
+}
+
+void
+munmap (mapid_t mapping)
+{
+  return;
 }
 
 /* Determines whether the supplied pointer references a valid string. */

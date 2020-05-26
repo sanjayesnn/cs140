@@ -8,6 +8,8 @@
 #include "threads/synch.h"
 #include "userprog/process.h"
 
+typedef int mapid_t;
+
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -24,6 +26,16 @@ struct file_data
     int fd;                       /* File descriptor number. */
     struct list_elem elem;        /* List element for open files list. */
   };
+
+/* Data associated with an mmaped file. */
+struct mmap_file
+{
+  mapid_t map_id;                     /* Map id. */
+  struct file *file;                  /* File the memory maps to. */
+  uint8_t *upage;                     /* Virtual address of first page. */
+  size_t num_pages;                   /* Number of mapped pages. */
+  struct list_elem elem;              /* List elem for mapped files list. */
+};
 
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
@@ -116,6 +128,8 @@ struct thread
 
 #ifdef VM
     struct hash spt;
+    struct list mmap_list;             /* List of memory mapped files. */
+    int next_mapping_id;               /* Mapping id for next mapped file. */
 #endif
 
     /* Owned by thread.c. */

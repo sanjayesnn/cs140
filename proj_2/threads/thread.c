@@ -212,6 +212,8 @@ thread_create (const char *name, int priority,
 
 #ifdef VM
   spt_init (&t->spt);
+  list_init (&t->mmap_list);
+  t->next_mapping_id = 0;
 #endif
   /* Add to run queue. */
   thread_unblock (t);
