@@ -35,6 +35,7 @@ struct spt_elem* spt_get_page (struct hash* spt, void *upage);
 
 void spt_remove_page (struct hash *spt, struct spt_elem *entry);
 void spt_free (struct hash *spt);
+void vm_free_page (struct spt_elem *spte);
 
 
 #endif

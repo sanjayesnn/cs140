@@ -30,6 +30,7 @@ static void syscall_handler (struct intr_frame *);
 static bool is_valid_string_memory (const void *vaddr);
 static bool is_valid_memory_range (const void *vaddr, size_t size, bool is_writable);
 struct file_data *get_file_with_fd (int fd);
+struct mmap_file *get_mmap_file_with_mapping (mapid_t mapping);
 static void *get_nth_syscall_arg (void *esp, int n);
 static void call_syscall (struct intr_frame *f, int syscall);
 
@@ -367,7 +368,7 @@ void
 close (int fd)
 {
   struct file_data *f = get_file_with_fd (fd);
-  if (f == NULL) 
+  if (f == NULL)
     return;
   
   acquire_fs_lock ();
@@ -444,10 +445,43 @@ mmap (int fd, void *addr)
   return mf->map_id;
 }
 
+struct mmap_file *
+get_mmap_file_with_mapping (mapid_t mapping)
+{
+  struct thread *cur = thread_current();
+  struct list_elem *e;
+  for (e = list_begin (&cur->mmap_list); e != list_end (&cur->mmap_list);
+       e = list_next (e)) 
+    {
+      struct mmap_file *mf = list_entry (e, struct mmap_file, elem);
+      if (mf->map_id == mapping) 
+          return mf;
+    }
+  
+  return NULL;
+}
+
+/* TODO: Synchronize data structure access. */
 void
 munmap (mapid_t mapping)
 {
-  return;
+  struct mmap_file *mf = get_mmap_file_with_mapping (mapping);
+  if (mf == NULL)
+    return;
+  
+  list_remove (&mf->elem);
+
+  struct thread *cur = thread_current();
+  size_t num_pages = mf->num_pages;
+  for (size_t page_num = 0; page_num < num_pages; page_num++)
+    {
+      void *addr = (char *)mf->upage + page_num * PGSIZE;
+      struct spt_elem *spte = spt_get_page (&cur->spt, addr);
+      if (spte != NULL)
+        vm_free_page (spte);;
+    }
+  
+  free (mf);
 }
 
 /* Determines whether the supplied pointer references a valid string. */

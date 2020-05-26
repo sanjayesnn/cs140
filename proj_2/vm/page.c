@@ -1,7 +1,12 @@
 #include "vm/page.h"
 
 #include <stdio.h>
+#include "filesys/file.h"
 #include "threads/malloc.h"
+#include "threads/thread.h"
+#include "threads/vaddr.h"
+#include "userprog/pagedir.h"
+#include "vm/frame.h"
 
 
 unsigned hash_func (const struct hash_elem *e, void *aux);
@@ -79,5 +84,28 @@ spt_get_page (struct hash *spt, void *upage)
   return hash_entry (res,
                      struct spt_elem,
                      elem);
+}
+
+/*
+ * Frees memory associated with the given supplemental page table entry.
+ */ 
+void 
+vm_free_page (struct spt_elem *spte)
+{
+  struct thread *cur = thread_current ();
+  void *kpage = pagedir_get_page (cur->pagedir, spte->upage);
+  pagedir_clear_page (cur->pagedir, spte->upage);
+
+  /* Write file to disk if necessary. */
+  if (spte->file != NULL && 
+      spte->writable && 
+      is_file_writable (spte->file) &&
+      pagedir_is_dirty (cur->pagedir, spte->upage))
+    {
+      off_t write_size = PGSIZE - spte->zero_bytes;
+      file_write_at (spte->file, kpage, write_size, spte->ofs);
+    } 
+
+  vm_free_frame (kpage);
 }
 
