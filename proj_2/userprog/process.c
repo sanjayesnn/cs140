@@ -389,7 +389,6 @@ load (const char *cmdline, void (**eip) (void), void **esp)
   if (!setup_stack (esp))
     goto done;
 
-
   /* Insert command and arguments into the stack */
 
   /* First, copying the argument strings into the stack */
@@ -426,12 +425,9 @@ load (const char *cmdline, void (**eip) (void), void **esp)
 
  
 
-  /* TODO: remove debug code
-   * size_t NUM_BYTES = PHYS_BASE - *esp;
-  hex_dump ((uintptr_t)(*esp), (char*)(*esp), NUM_BYTES, true); */
-
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
+
 
   success = true;
 
@@ -442,6 +438,7 @@ load (const char *cmdline, void (**eip) (void), void **esp)
 
 /* load() helpers. */
 
+static bool install_page (void *upage, void *kpage, bool writable);
 
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
@@ -506,7 +503,6 @@ static bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
               uint32_t read_bytes, uint32_t zero_bytes, bool writable) 
 {
-  printf("Load segment called with upage %x\n", upage);
   ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
@@ -521,7 +517,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       struct thread *cur = thread_current ();
-      spt_add_page (&cur->spt, upage, writable);
+      spt_add_page (&cur->spt, upage, writable, true);
       struct spt_elem *new_page = spt_get_page (&cur->spt, upage);
       new_page->zero_bytes = page_zero_bytes;
       new_page->file = file;

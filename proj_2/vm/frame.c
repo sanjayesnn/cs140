@@ -9,7 +9,6 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
-#include "userprog/process.h" /* For install_page */
 #include "vm/page.h"
 #include "vm/swap.h"
 
@@ -55,7 +54,6 @@ ft_destruct (void)
 void
 increment_clock_hand (void)
 {
-    printf("Incrementing clock hand\n");
   struct list_elem *e = &clock_hand->elem;
   if (e == list_back (&frame_table))
     clock_hand = list_entry (list_front (&frame_table),
@@ -71,7 +69,6 @@ increment_clock_hand (void)
 void
 ft_evict_page (void) 
 {
-  printf("Evicting a page\n");
   ASSERT (clock_hand);
   while (true) 
   {
@@ -107,6 +104,8 @@ ft_evict_page (void)
 
         lock_release (&spte->spt_elem_lock);
         palloc_free_page (kpage);
+        pagedir_clear_page (pd, upage);
+
         // Removes the current frame table elem and increments clock hand
         struct frame_table_elem *clock_hand_cp = clock_hand;
         increment_clock_hand ();
@@ -128,6 +127,7 @@ vm_page_in (void *upage)
 {
   struct hash *spt = &thread_current ()->spt;
   struct spt_elem *page = spt_get_page (spt, upage);
+  ASSERT (page->status != IN_MEMORY); // TODO: this could happen for synchronization reasons??
   if (page == NULL) {
      printf ("No page to page in at %x. Spt has %d elements.\n", upage, hash_size (spt));
      return false;
@@ -142,9 +142,8 @@ vm_page_in (void *upage)
       block_sector_t start_sector = page->swap_sector;
       swap_read (kpage, start_sector);
     }
-  else if (page->status == IN_FILESYS)
+  else if (page->status == IN_FILESYS) 
     {
-      //
       size_t page_zero_bytes = page->zero_bytes;
       size_t page_read_bytes = PGSIZE - page_zero_bytes;
       struct file* file = page->file;
@@ -161,13 +160,10 @@ vm_page_in (void *upage)
       memset (kpage + page_read_bytes, 0, page_zero_bytes); 
     }
 
+
   /* Adds a mapping from upage to kpage */
-  if (!install_page (upage, kpage, page->writable))
-    {
-      // TODO: Figure out whether this should ever happen
-      vm_free_frame (kpage);
-      return false;
-    }
+  struct thread *t = thread_current ();
+  pagedir_set_page (t->pagedir, upage, kpage, page->writable);
 
   /* Does bookkeeping */ 
   lock_acquire (&page->spt_elem_lock);
@@ -180,7 +176,6 @@ vm_page_in (void *upage)
 void *
 vm_get_frame (enum palloc_flags flags, void *upage, bool writable) 
 {
-    printf("Creating new frame with upage %x\n", upage);
   void *kpage = palloc_get_page (flags);
   if (kpage == NULL)
     {
@@ -195,7 +190,7 @@ vm_get_frame (enum palloc_flags flags, void *upage, bool writable)
   if (spt_get_page (&cur->spt, upage) == NULL) 
     {
       /* Creates a new supplemental page table entry for this page */ 
-      spt_add_page (&cur->spt, upage, writable);
+      spt_add_page (&cur->spt, upage, writable, false);
     }
 
   struct frame_table_elem *new_entry = 
@@ -237,5 +232,7 @@ vm_free_frame (void *kpage)
   struct thread* cur = thread_current ();
   spt_remove_page (&cur->spt, fte->page_data);
   free (fte);
+
   palloc_free_page (kpage);
+
 }

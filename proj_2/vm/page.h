@@ -30,7 +30,7 @@ struct spt_elem
   };
 
 void spt_init (struct hash* spt);
-void spt_add_page (struct hash* spt, void *upage, bool writable);
+void spt_add_page (struct hash* spt, void *upage, bool writable, bool lazy);
 struct spt_elem* spt_get_page (struct hash* spt, void *upage);
 
 void spt_remove_page (struct hash *spt, struct spt_elem *entry);

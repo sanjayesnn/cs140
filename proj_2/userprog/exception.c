@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "userprog/exception.h"
+#include <debug.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include "userprog/gdt.h"
@@ -165,10 +166,10 @@ page_fault (struct intr_frame *f)
   if (not_present)
     {
       /* Tries to page in */
-      void *upage = pg_round_down (f->eip);
-      printf("Page fault happened at %x. Paging in page at %x\n", f->eip, upage);
+      void *upage = pg_round_down (fault_addr);
       if (vm_page_in (upage)) return;
     }
+
 
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to

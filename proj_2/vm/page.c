@@ -42,11 +42,10 @@ spt_init (struct hash *spt)
 }
 
 void
-spt_add_page (struct hash *spt, void *upage, bool writable)
+spt_add_page (struct hash *spt, void *upage, bool writable, bool lazy)
 {
   struct spt_elem *entry = malloc (sizeof (struct spt_elem));
-  printf("Adding page with upage %x\n", upage);
-  entry->status = IN_MEMORY;
+  entry->status = lazy ? IN_FILESYS : IN_MEMORY;
   lock_init (&entry->spt_elem_lock);
   entry->upage = upage;
   entry->writable = writable;
