@@ -180,7 +180,6 @@ page_fault (struct intr_frame *f)
       if (vm_add_stack_page ()) return;
     }
 
-  printf("Page faulting. Fault addr %x, stack end %x, esp %x\n", fault_addr, thread_current ()->stack_end, f->esp); 
 
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
