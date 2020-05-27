@@ -174,6 +174,19 @@ vm_page_in (void *upage)
   return true;
 }
 
+bool
+vm_add_stack_page ()
+{
+  struct thread *t = thread_current ();
+  uint8_t *stack_end = t->stack_end;
+  void *upage = stack_end - PGSIZE;
+  void *kpage = vm_get_frame (PAL_USER | PAL_ZERO, upage, true);
+  if (kpage == NULL) return false;
+  t->stack_end = stack_end - PGSIZE;
+  pagedir_set_page (t->pagedir, upage, kpage, true);
+  return true; 
+}
+
 
 void *
 vm_get_frame (enum palloc_flags flags, void *upage, bool writable) 

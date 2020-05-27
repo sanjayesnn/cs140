@@ -130,6 +130,7 @@ struct thread
     struct hash spt;
     struct list mmap_list;             /* List of memory mapped files. */
     int next_mapping_id;               /* Mapping id for next mapped file. */
+    uint8_t *stack_end;               /* End of stack segment */
 #endif
 
     /* Owned by thread.c. */

@@ -551,6 +551,8 @@ setup_stack (void **esp)
       else
         vm_free_frame (kpage);
     }
+
+  thread_current ()->stack_end = ((uint8_t *) PHYS_BASE) - PGSIZE;
   return success;
 }
 
