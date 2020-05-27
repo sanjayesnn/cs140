@@ -16,7 +16,7 @@ struct list frame_table;
 struct frame_table_elem *clock_hand; /* Position of "hand" for clock alg. */
 struct lock frame_table_lock;
 
-struct frame_table_elem* ft_find_frame (void *upage);
+struct frame_table_elem* ft_find_frame (void *kpage);
 void increment_clock_hand (void);
 void ft_evict_page (void);
 
@@ -96,6 +96,7 @@ ft_evict_page (void)
           {
             /* Not accessed, is dirty */
             // TODO: make sure that the data is not being accessed right now
+            // TODO: handle memory mapped files
             block_sector_t new_swap_sector = swap_write (kpage);
             
             spte->swap_sector = new_swap_sector;
@@ -169,6 +170,7 @@ vm_page_in (void *upage)
   lock_acquire (&page->spt_elem_lock);
   page->status = IN_MEMORY;
   lock_release (&page->spt_elem_lock);
+  // printf("Page in returning true, addr: %x\n", upage);
   return true;
 }
 
@@ -203,11 +205,12 @@ vm_get_frame (enum palloc_flags flags, void *upage, bool writable)
   if (clock_hand == NULL)
     clock_hand = new_entry;
   lock_release (&frame_table_lock);
+  // printf("VM get frame returning kpage: %x\n", kpage);
   return kpage;
 }
 
 struct frame_table_elem*
-ft_find_frame (void *upage)
+ft_find_frame (void *kpage)
 {
   for (struct list_elem *e = list_begin (&frame_table);
           e != list_end (&frame_table);
@@ -216,8 +219,8 @@ ft_find_frame (void *upage)
       struct frame_table_elem *cur = list_entry (e,
                                                  struct frame_table_elem,
                                                  elem);
-      if (cur->page_data->upage == upage)
-        return upage;
+      if (cur->kpage == kpage)
+        return cur;
     }
   return NULL;
 }
@@ -226,6 +229,7 @@ void
 vm_free_frame (void *kpage) 
 {
   struct frame_table_elem *fte = ft_find_frame (kpage);
+  // printf("Frame table elem: %x\n", fte);
   lock_acquire (&frame_table_lock);
   list_remove (&fte->elem);
   lock_release (&frame_table_lock);

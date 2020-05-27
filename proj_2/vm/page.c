@@ -92,20 +92,27 @@ spt_get_page (struct hash *spt, void *upage)
 void 
 vm_free_page (struct spt_elem *spte)
 {
+  void *upage = spte->upage;
+  // printf("VM free page called, addr: %x\n", upage);
   struct thread *cur = thread_current ();
-  void *kpage = pagedir_get_page (cur->pagedir, spte->upage);
+  void *kpage = pagedir_get_page (cur->pagedir, upage);
+  if (kpage == NULL)
+    return;
+
 
   /* Write file to disk if necessary. */
   if (spte->file != NULL && 
       spte->writable && 
       is_file_writable (spte->file) &&
-      pagedir_is_dirty (cur->pagedir, spte->upage))
+      pagedir_is_dirty (cur->pagedir, upage))
     {
       off_t write_size = PGSIZE - spte->zero_bytes;
       file_write_at (spte->file, kpage, write_size, spte->ofs);
     } 
 
-  pagedir_clear_page (cur->pagedir, spte->upage);
+  // printf("Entering VM free frame, kpage = %x\n", kpage);
   vm_free_frame (kpage);
+  // printf("VM free page exiting.\n");
+  pagedir_clear_page (cur->pagedir, upage);
 }
 
