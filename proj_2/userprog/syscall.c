@@ -381,14 +381,16 @@ close (int fd)
 mapid_t
 mmap (int fd, void *addr)
 {
+  // printf("Inside of mmap, addr = %p\n", addr);
   // TODO: figure out how to validate memory
-
   if (addr == 0x0 || pg_ofs (addr) != 0)
     return -1;
 
   struct file_data *f = get_file_with_fd (fd);
+  if (f == NULL)
+    return -1;
   int file_len = file_length (f->file_ptr);
-  if (f == NULL || file_len <= 0) 
+  if (file_len <= 0) 
     return -1;
 
   /* Ensure memory doesn't overlaps any existing set of mapped pages. */
@@ -465,6 +467,7 @@ get_mmap_file_with_mapping (mapid_t mapping)
 void
 munmap (mapid_t mapping)
 {
+  // printf("Inside of munmap, mapping = %d\n", mapping);
   struct mmap_file *mf = get_mmap_file_with_mapping (mapping);
   if (mf == NULL)
     return;
@@ -477,11 +480,13 @@ munmap (mapid_t mapping)
     {
       void *addr = (char *)mf->upage + page_num * PGSIZE;
       struct spt_elem *spte = spt_get_page (&cur->spt, addr);
+      // printf("Calling vm_free_page\n");
       if (spte != NULL)
         vm_free_page (spte);
     }
   
   free (mf);
+  // printf("Munmap returning\n");
 }
 
 /* Determines whether the supplied pointer references a valid string. */

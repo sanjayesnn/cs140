@@ -97,8 +97,10 @@ vm_free_page (struct spt_elem *spte)
   struct thread *cur = thread_current ();
   void *kpage = pagedir_get_page (cur->pagedir, upage);
   if (kpage == NULL)
-    return;
-
+    {
+      spt_remove_page (&cur->spt, spte);
+      return;
+    }
 
   /* Write file to disk if necessary. */
   if (spte->file != NULL && 

@@ -128,11 +128,11 @@ vm_page_in (void *upage)
 {
   struct hash *spt = &thread_current ()->spt;
   struct spt_elem *page = spt_get_page (spt, upage);
-  ASSERT (page->status != IN_MEMORY); // TODO: this could happen for synchronization reasons??
   if (page == NULL) {
-     printf ("No page to page in at %x. Spt has %d elements.\n", upage, hash_size (spt));
+     // printf ("No page to page in at %x. Spt has %d elements.\n", upage, hash_size (spt));
      return false;
   }
+  ASSERT (page->status != IN_MEMORY); // TODO: this could happen for synchronization reasons??
 
   /* Gets an empty frame */
   void *kpage = vm_get_frame (PAL_USER, upage, page->writable);
