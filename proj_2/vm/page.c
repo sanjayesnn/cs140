@@ -94,7 +94,6 @@ vm_free_page (struct spt_elem *spte)
 {
   struct thread *cur = thread_current ();
   void *kpage = pagedir_get_page (cur->pagedir, spte->upage);
-  pagedir_clear_page (cur->pagedir, spte->upage);
 
   /* Write file to disk if necessary. */
   if (spte->file != NULL && 
@@ -106,6 +105,7 @@ vm_free_page (struct spt_elem *spte)
       file_write_at (spte->file, kpage, write_size, spte->ofs);
     } 
 
+  pagedir_clear_page (cur->pagedir, spte->upage);
   vm_free_frame (kpage);
 }
 

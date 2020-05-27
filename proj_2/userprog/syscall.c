@@ -430,10 +430,10 @@ mmap (int fd, void *addr)
       zero_bytes = (ofs + PGSIZE >= file_len) ? PGSIZE + ofs - file_len : 0;
       
       spt_add_page (&cur->spt, (char *)addr + ofs, writable, true);
-      struct spt_elem *new_page = spt_get_page (&cur->spt, upage);
+      struct spt_elem *new_page = spt_get_page (&cur->spt, (char *)addr + ofs);
       if (new_page == NULL)
         return -1;
-      new_page->zero_bytes = PGSIZE - zero_bytes;
+      new_page->zero_bytes = zero_bytes;
       new_page->file = reopened_file;
       new_page->ofs = ofs;
 
