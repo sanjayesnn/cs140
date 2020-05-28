@@ -172,7 +172,8 @@ page_fault (struct intr_frame *f)
       if (vm_page_in (upage)) return;
     }
 
-  if (user && (fault_addr == f->esp - 4 
+  if (user && fault_addr > PHYS_BASE &&
+              (fault_addr == f->esp - 4 
                || fault_addr == f->esp - 32
                || fault_addr >= f->esp)) 
     {
