@@ -172,7 +172,7 @@ page_fault (struct intr_frame *f)
       if (vm_page_in (upage)) return;
     }
 
-  if (user && fault_addr > PHYS_BASE &&
+  if (user && fault_addr < PHYS_BASE &&
               (fault_addr == f->esp - 4 
                || fault_addr == f->esp - 32
                || fault_addr >= f->esp)) 
@@ -184,12 +184,12 @@ page_fault (struct intr_frame *f)
 
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
-     which fault_addr refers. */
+     which fault_addr refers. 
   printf ("Page fault at %p: %s error %s page in %s context.\n",
           fault_addr,
           not_present ? "not present" : "rights violation",
           write ? "writing" : "reading",
-          user ? "user" : "kernel");
+          user ? "user" : "kernel"); */
   kill (f);
 }
 
