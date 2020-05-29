@@ -540,11 +540,12 @@ is_valid_memory_range (const void *vaddr, size_t size, bool is_writable)
       if (upage == NULL || !is_user_vaddr (upage))
         return false;
 
-      uint32_t *pte = lookup_page (thread_current ()->pagedir, upage, false);
-      if (pte == NULL || (*pte & PTE_P) == 0)
-        return false;
+      struct spt_elem *spte = spt_get_page (&thread_current ()->spt, upage);
+      if (spte == NULL)
+          return false;
+
       /* Page is writable. */
-      if (is_writable && (*pte & PTE_W) == 0)
+      if (is_writable && !spte->writable)
         return false;
       
       upage = (char *) upage + PGSIZE;
