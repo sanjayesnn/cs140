@@ -13,4 +13,7 @@ bool vm_add_stack_page (void);
 void *vm_get_frame (enum palloc_flags, void *upage, bool writable);
 void vm_free_frame (void *kpage);
 
+void vm_pin_frame (void *upage);
+void vm_unpin_frame (void *upage);
+
 #endif

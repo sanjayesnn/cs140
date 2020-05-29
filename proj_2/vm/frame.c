@@ -17,6 +17,7 @@ struct frame_table_elem *clock_hand; /* Position of "hand" for clock alg. */
 struct lock frame_table_lock;
 
 struct frame_table_elem* ft_find_frame (void *kpage);
+struct frame_table_elem* ft_find_frame_by_upage (void *upage);
 void increment_clock_hand (void);
 void ft_evict_page (void);
 
@@ -72,6 +73,12 @@ ft_evict_page (void)
   ASSERT (clock_hand);
   while (true) 
   {
+    /* Check if frame pointed to by clock hand is pinned. */
+    if (clock_hand->page_data->is_pinned)
+      {
+        increment_clock_hand ();
+        continue;
+      }
     // Check clock_hand for reference and dirty bit
     void *upage = clock_hand->page_data->upage;
     struct thread *t = clock_hand->holder;
@@ -168,6 +175,7 @@ vm_page_in (void *upage)
   lock_acquire (&page->spt_elem_lock);
   page->status = IN_MEMORY;
   lock_release (&page->spt_elem_lock);
+
   // printf("Page in returning true, addr: %x\n", upage);
   return true;
 }
@@ -239,6 +247,22 @@ ft_find_frame (void *kpage)
   return NULL;
 }
 
+struct frame_table_elem*
+ft_find_frame_by_upage (void *upage)
+{
+  for (struct list_elem *e = list_begin (&frame_table);
+          e != list_end (&frame_table);
+          e = list_next (e))
+    {
+      struct frame_table_elem *cur = list_entry (e,
+                                                 struct frame_table_elem,
+                                                 elem);
+      if (cur->page_data->upage == upage)
+        return cur;
+    }
+  return NULL;
+}
+
 void 
 vm_free_frame (void *kpage) 
 {
@@ -250,3 +274,68 @@ vm_free_frame (void *kpage)
   free (fte);
   palloc_free_page (kpage);
 }
+
+void
+vm_pin_frame (void *upage)
+{
+  struct hash *spt = &thread_current ()->spt;
+  struct spt_elem *page = spt_get_page (spt, upage);
+  ASSERT (page != NULL);
+  ASSERT (!page->is_pinned);
+  lock_acquire (&page->spt_elem_lock);
+  page->is_pinned = true;
+  bool page_in = (page->status != IN_MEMORY);
+  lock_release (&page->spt_elem_lock);
+  if (page_in)
+    vm_page_in (upage);
+}
+
+void
+vm_unpin_frame (void *upage)
+{
+  struct frame_table_elem *fte = ft_find_frame_by_upage (upage);
+  ASSERT (fte != NULL);
+  ASSERT (fte->page_data->is_pinned);
+  fte->page_data->is_pinned = false;
+}
+
+/*
+ * First attempt at pinning: although it makes more sense to have pinned
+ * bool in the frame struct, we end up with this weird edge case
+ * race condition handled by while loop, which is kind of an ugly/
+ * roundabout way to handle the race condition (in the event of thrashing
+ * we could be stuck in the loop forever)
+bool
+vm_pin_frame (void *upage)
+{
+  struct hash *spt = &thread_current ()->spt;
+  struct spt_elem *page = spt_get_page (spt, upage);
+  lock_acquire (&frame_table_lock);
+  while (page->status != IN_MEMORY)
+    {
+      lock_release (&frame_table_lock);
+      vm_page_in (upage);
+      lock_acquire (&frame_table_lock);
+    }
+
+  struct frame_table_elem *fte = ft_find_frame_by_upage (upage);
+  ASSERT (fte != NULL);
+  ASSERT (!fte->pinned);
+  fte->pinned = true;
+  lock_release (&frame_table_lock);
+  return true;
+}
+
+bool
+vm_unpin_frame (void *upage)
+{
+  lock_acquire (&frame_table_lock);
+  struct frame_table_elem *fte = ft_find_frame (kpage);
+  ASSERT (fte != NULL);
+  ASSERT (fte->pinned);
+  fte->pinned = false;
+  lock_release (&frame_table_lock);
+  return true;
+
+}
+*/

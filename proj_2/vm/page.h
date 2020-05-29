@@ -23,6 +23,7 @@ struct spt_elem
     struct lock spt_elem_lock;
     struct hash_elem elem;
     bool writable;
+    bool is_pinned;
 
     off_t ofs;
     uint32_t zero_bytes;

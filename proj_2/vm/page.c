@@ -55,6 +55,7 @@ spt_add_page (struct hash *spt, void *upage, bool writable, bool lazy)
   lock_init (&entry->spt_elem_lock);
   entry->upage = upage;
   entry->writable = writable;
+  entry->is_pinned = false;
   hash_insert (spt, &entry->elem);
 }
 
