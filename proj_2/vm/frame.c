@@ -96,9 +96,7 @@ ft_evict_page (void)
           {
             /* Not accessed, is dirty */
             // TODO: make sure that the data is not being accessed right now
-            // TODO: handle memory mapped files
             block_sector_t new_swap_sector = swap_write (kpage);
-            
             spte->swap_sector = new_swap_sector;
             spte->status = IN_SWAP;
           }
@@ -206,6 +204,9 @@ vm_get_frame (enum palloc_flags flags, void *upage, bool writable)
     {
       /* Creates a new supplemental page table entry for this page */ 
       spt_add_page (&cur->spt, upage, writable, false);
+      struct spt_elem *new_page = spt_get_page (&cur->spt, upage);
+      if (new_page != NULL)
+        new_page->file = NULL;
     }
 
   struct frame_table_elem *new_entry = 
@@ -246,10 +247,6 @@ vm_free_frame (void *kpage)
   lock_acquire (&frame_table_lock);
   list_remove (&fte->elem);
   lock_release (&frame_table_lock);
-  struct thread* cur = thread_current ();
-  spt_remove_page (&cur->spt, fte->page_data);
   free (fte);
-
   palloc_free_page (kpage);
-
 }

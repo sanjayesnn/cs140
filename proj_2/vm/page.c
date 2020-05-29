@@ -7,6 +7,7 @@
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 #include "vm/frame.h"
+#include "vm/swap.h"
 
 
 unsigned hash_func (const struct hash_elem *e, void *aux);
@@ -88,33 +89,35 @@ spt_get_page (struct hash *spt, void *upage)
 
 /*
  * Frees memory associated with the given supplemental page table entry.
+ * NOTE: Actually freeing the spt_elem occurs in munmap and hash_free_elem.
+ * This is to prevent undefined behavior while iterating over a hash table.
  */ 
-void 
+void
 vm_free_page (struct spt_elem *spte)
 {
   void *upage = spte->upage;
-  // printf("VM free page called, addr: %x\n", upage);
   struct thread *cur = thread_current ();
-  void *kpage = pagedir_get_page (cur->pagedir, upage);
-  if (kpage == NULL)
+
+  if (spte->status == IN_SWAP)
     {
-      spt_remove_page (&cur->spt, spte);
-      return;
+      swap_free (spte->swap_sector);
     }
-
-  /* Write file to disk if necessary. */
-  if (spte->file != NULL && 
-      spte->writable && 
-      is_file_writable (spte->file) &&
-      pagedir_is_dirty (cur->pagedir, upage))
+  else if (spte->status == IN_MEMORY)
     {
-      off_t write_size = PGSIZE - spte->zero_bytes;
-      file_write_at (spte->file, kpage, write_size, spte->ofs);
-    } 
+      void *kpage = pagedir_get_page (cur->pagedir, upage);
 
-  // printf("Entering VM free frame, kpage = %x\n", kpage);
-  vm_free_frame (kpage);
-  // printf("VM free page exiting.\n");
+      /* Write file to disk if necessary. */
+      if (spte->file != NULL && 
+          kpage != NULL && 
+          spte->writable && 
+          pagedir_is_dirty (cur->pagedir, upage))
+        {
+          off_t write_size = PGSIZE - spte->zero_bytes;
+          file_write_at (spte->file, kpage, write_size, spte->ofs);
+        } 
+
+      vm_free_frame (kpage);
+    }
+  
   pagedir_clear_page (cur->pagedir, upage);
 }
-

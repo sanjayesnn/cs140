@@ -483,10 +483,12 @@ munmap (mapid_t mapping)
       // printf("Calling vm_free_page\n");
       if (spte != NULL)
         vm_free_page (spte);
+        hash_delete (&cur->spt, &spte->elem);
+        free (spte);
     }
   
+  file_close (mf->file);
   free (mf);
-  // printf("Munmap returning\n");
 }
 
 /* Determines whether the supplied pointer references a valid string. */

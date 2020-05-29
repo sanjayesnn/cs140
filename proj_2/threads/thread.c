@@ -333,9 +333,6 @@ thread_exit (void)
     release_fs_lock ();
 #endif
 
-#ifdef VM
-  spt_free (&cur->spt);
-#endif
 
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us

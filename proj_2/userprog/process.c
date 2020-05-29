@@ -148,6 +148,34 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+  
+  #ifdef VM
+  struct hash_iterator i;
+
+  hash_first (&i, &cur->spt);
+  while (hash_next (&i))
+    {
+      struct spt_elem *spte = hash_entry (hash_cur (&i), 
+                                          struct spt_elem, 
+                                          elem);
+      if (spte != NULL)
+          vm_free_page (spte);
+    }
+
+  /* Close all memory mapped files. */
+  struct list_elem *cur_elem = list_begin (&cur->mmap_list);
+  struct list_elem *end_elem = list_end (&cur->mmap_list);
+  while (cur_elem != end_elem)
+    {
+      struct mmap_file *mf = list_entry (cur_elem, struct mmap_file, elem);
+      struct list_elem *next = list_next (cur_elem);   
+      file_close (mf->file);
+      free (mf);
+      cur_elem = next;
+    }
+  
+  spt_free (&cur->spt);
+  #endif
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
