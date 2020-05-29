@@ -508,9 +508,8 @@ is_valid_string_memory (const void *vaddr)
       if (upage == NULL || !is_user_vaddr (upage))
         return false;
 
-      uint32_t *pte = lookup_page (thread_current ()->pagedir, upage, false);
-      if (pte == NULL || (*pte & PTE_P) == 0)
-        return false;
+      if (spt_get_page (&thread_current ()->spt, upage) == NULL)
+          return false;
       
       while (cur < (char *) upage + PGSIZE) 
         {
