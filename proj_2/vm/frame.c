@@ -266,9 +266,13 @@ ft_find_frame_by_upage (void *upage)
 void 
 vm_free_frame (void *kpage) 
 {
+  lock_acquire (&frame_table_lock);
   struct frame_table_elem *fte = ft_find_frame (kpage);
   // printf("Frame table elem: %x\n", fte);
-  lock_acquire (&frame_table_lock);
+  if (fte == NULL)
+    return;
+  if (fte == clock_hand)
+    increment_clock_hand();
   list_remove (&fte->elem);
   lock_release (&frame_table_lock);
   free (fte);
