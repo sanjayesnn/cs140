@@ -133,6 +133,7 @@ vm_page_in (void *upage)
 {
   struct hash *spt = &thread_current ()->spt;
   struct spt_elem *page = spt_get_page (spt, upage);
+
   if (page == NULL) {
      // printf ("No page to page in at %x. Spt has %d elements.\n", upage, hash_size (spt));
      return false;
@@ -146,7 +147,9 @@ vm_page_in (void *upage)
     {
       /* Fetches the page from swap */
       block_sector_t start_sector = page->swap_sector;
+      vm_pin_frame (upage, false);
       swap_read (kpage, start_sector);
+      vm_unpin_frame (upage);
     }
   else if (page->status == IN_FILESYS) 
     {
@@ -280,7 +283,7 @@ vm_free_frame (void *kpage)
 }
 
 void
-vm_pin_frame (void *upage)
+vm_pin_frame (void *upage, bool page_in)
 {
   struct hash *spt = &thread_current ()->spt;
   struct spt_elem *page = spt_get_page (spt, upage);
@@ -288,9 +291,9 @@ vm_pin_frame (void *upage)
   ASSERT (!page->is_pinned);
   lock_acquire (&page->spt_elem_lock);
   page->is_pinned = true;
-  bool page_in = (page->status != IN_MEMORY);
+  bool not_in_memory = (page->status != IN_MEMORY);
   lock_release (&page->spt_elem_lock);
-  if (page_in)
+  if (not_in_memory && page_in)
     vm_page_in (upage);
 }
 
