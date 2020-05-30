@@ -17,7 +17,6 @@ struct frame_table_elem *clock_hand; /* Position of "hand" for clock alg. */
 struct lock frame_table_lock;
 
 struct frame_table_elem* ft_find_frame (void *kpage);
-struct frame_table_elem* ft_find_frame_by_upage (void *upage);
 void increment_clock_hand (void);
 void ft_evict_page (void);
 
@@ -161,9 +160,12 @@ vm_page_in (void *upage)
     {
       /* Fetches the page from swap */
       block_sector_t start_sector = page->swap_sector;
-      vm_pin_frame (upage, false);
+      bool was_pinned = page->is_pinned;
+      if (!page->is_pinned)
+        vm_pin_frame (upage, false);
       swap_read (kpage, start_sector);
-      vm_unpin_frame (upage);
+      if (!was_pinned)
+        vm_unpin_frame (upage);
     }
   else if (page->status == IN_FILESYS) 
     {
@@ -264,22 +266,6 @@ ft_find_frame (void *kpage)
   return NULL;
 }
 
-struct frame_table_elem*
-ft_find_frame_by_upage (void *upage)
-{
-  for (struct list_elem *e = list_begin (&frame_table);
-          e != list_end (&frame_table);
-          e = list_next (e))
-    {
-      struct frame_table_elem *cur = list_entry (e,
-                                                 struct frame_table_elem,
-                                                 elem);
-      if (cur->page_data->upage == upage)
-        return cur;
-    }
-  return NULL;
-}
-
 void 
 vm_free_frame (void *kpage) 
 {
@@ -314,10 +300,12 @@ vm_pin_frame (void *upage, bool page_in)
 void
 vm_unpin_frame (void *upage)
 {
-  struct frame_table_elem *fte = ft_find_frame_by_upage (upage);
-  ASSERT (fte != NULL);
-  ASSERT (fte->page_data->is_pinned);
-  fte->page_data->is_pinned = false;
+  struct hash *spt = &thread_current ()->spt;
+  struct spt_elem *page = spt_get_page (spt, upage);
+  //struct frame_table_elem *fte = ft_find_frame_by_upage (upage);
+  ASSERT (page != NULL);
+  ASSERT (page->is_pinned);
+  page->is_pinned = false;
 }
 
 /*
