@@ -16,6 +16,7 @@
 #include "devices/input.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "vm/frame.h"
 #include "vm/page.h"
 
 /* Each syscall argument takes up 4 bytes on the stack. */
@@ -305,9 +306,26 @@ read (int fd, void *buffer, unsigned size)
       struct file_data *f = get_file_with_fd (fd);
       if (f == NULL) 
         return -1;
+      void *upage = pg_round_down (buffer);
+      /* Pin every page in the buffer range. */
+      while ((char *) upage < (char *) buffer + size)
+        {
+          vm_pin_frame (upage, true);
+          upage = (char *) upage + PGSIZE;
+        }
+
       acquire_fs_lock ();
       int result = file_read (f->file_ptr, buffer, size); 
       release_fs_lock ();
+
+      upage = pg_round_down (buffer);
+      /* Unpin every page in the buffer range. */
+      while ((char *) upage < (char *) buffer + size)
+        {
+          vm_unpin_frame (upage);
+          upage = (char *) upage + PGSIZE;
+        }
+
       return result;
     }
 }
@@ -320,10 +338,23 @@ write (int fd, const void *buffer, unsigned size)
 
   if (fd == CONSOLE_FD)
     {
-      for (unsigned start = 0; start < size; start += MAX_PUT_SIZE)
+      for (unsigned ofs = 0; ofs < size; ofs += MAX_PUT_SIZE)
         {
-          putbuf (buffer + start,
-                  (MAX_PUT_SIZE < size - start) ? MAX_PUT_SIZE : size - start);
+          void *start = (void *)((char *) buffer + ofs);
+
+          void *start_page = pg_round_down (start);
+          void *next_page = pg_round_up (start);
+          ASSERT (start_page != next_page);
+          if ((void *) ((char *) start + (MAX_PUT_SIZE < size - ofs) ? MAX_PUT_SIZE : (size - ofs)) >= next_page)
+            vm_pin_frame (next_page, true);
+          vm_pin_frame (start_page, true);
+          
+          putbuf (start,
+                  (MAX_PUT_SIZE < size - ofs) ? MAX_PUT_SIZE : size - ofs);
+          
+          if ((void *) ((char *) start + (MAX_PUT_SIZE < size - ofs) ? MAX_PUT_SIZE : (size - ofs)) >= next_page) 
+            vm_unpin_frame (next_page);
+          vm_unpin_frame (start_page);
         }
       return size;
     }
@@ -332,9 +363,27 @@ write (int fd, const void *buffer, unsigned size)
       struct file_data *f = get_file_with_fd (fd);
       if (f == NULL) 
         return 0; 
+
+      void *upage = pg_round_down (buffer);
+      /* Pin every page in the buffer range. */
+      while ((char *) upage < (char *) buffer + size)
+        {
+          vm_pin_frame (upage, true);
+          upage = (char *) upage + PGSIZE;
+        }
+
       acquire_fs_lock ();
       int result = file_write (f->file_ptr, buffer, size);
       release_fs_lock ();
+
+      upage = pg_round_down (buffer);
+      /* Unpin every page in the buffer range. */
+      while ((char *) upage < (char *) buffer + size)
+        {
+          vm_unpin_frame (upage);
+          upage = (char *) upage + PGSIZE;
+        }
+
       return result;
     }
 }
