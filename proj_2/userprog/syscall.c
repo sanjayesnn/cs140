@@ -513,11 +513,9 @@ get_mmap_file_with_mapping (mapid_t mapping)
   return NULL;
 }
 
-/* TODO: Synchronize data structure access. */
 void
 munmap (mapid_t mapping)
 {
-  // printf("Inside of munmap, mapping = %d\n", mapping);
   struct mmap_file *mf = get_mmap_file_with_mapping (mapping);
   if (mf == NULL)
     return;
@@ -530,7 +528,6 @@ munmap (mapid_t mapping)
     {
       void *addr = (char *)mf->upage + page_num * PGSIZE;
       struct spt_elem *spte = spt_get_page (&cur->spt, addr);
-      // printf("Calling vm_free_page\n");
       if (spte != NULL)
         vm_free_page (spte);
         hash_delete (&cur->spt, &spte->elem);
