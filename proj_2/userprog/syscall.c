@@ -207,9 +207,12 @@ create (const char *file, unsigned initial_size)
   if (!is_valid_string_memory (file))
     exit (-1);
 
+  vm_pin_buffer_frames (file, strlen (file));
   acquire_fs_lock ();
   bool result = filesys_create (file, initial_size);
   release_fs_lock ();
+  vm_unpin_buffer_frames (file, strlen (file));
+
   return result;
 }
 
@@ -219,9 +222,12 @@ remove (const char *file)
   if (!is_valid_string_memory (file))
     exit (-1);
 
+  vm_pin_buffer_frames (file, strlen (file));
   acquire_fs_lock ();
   bool result = filesys_remove (file);
   release_fs_lock ();
+  vm_unpin_buffer_frames (file, strlen (file));
+
   return result;
 }
 
@@ -249,9 +255,11 @@ open (const char *file)
     exit (-1);
 
   struct thread *cur = thread_current ();
+  vm_pin_buffer_frames (file, strlen (file));
   acquire_fs_lock ();
   struct file *f = filesys_open (file);
   release_fs_lock ();
+  vm_unpin_buffer_frames (file, strlen (file));
   if (f == NULL)
     return -1;
   
