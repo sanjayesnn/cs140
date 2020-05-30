@@ -16,4 +16,7 @@ void vm_free_frame (void *kpage);
 void vm_pin_frame (void *upage, bool page_in);
 void vm_unpin_frame (void *upage);
 
+void vm_pin_buffer_frames (const void *buffer, int size);
+void vm_unpin_buffer_frames (const void *buffer, int size);
+
 #endif

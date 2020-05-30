@@ -301,3 +301,33 @@ vm_unpin_frame (void *upage)
   ASSERT (page->is_pinned);
   page->is_pinned = false;
 }
+
+/* Pins all frames covered by buffer of given size.
+ * All pages spanned by range [buffer, buffer+size]
+ * must be owned by calling process. */
+void
+vm_pin_buffer_frames (const void *buffer, int size)
+{
+  void *upage = pg_round_down (buffer);
+  /* Pin every page in the buffer range. */
+  while ((char *) upage < (char *) buffer + size)
+    {
+      vm_pin_frame (upage, true);
+      upage = (char *) upage + PGSIZE;
+    }
+}
+
+/* Unpins all frames covered by buffer of given size.
+ * All pages spanned by range [buffer, buffer+size]
+ * must be owned by calling process. */
+void
+vm_unpin_buffer_frames (const void *buffer, int size)
+{
+  void *upage = pg_round_down (buffer);
+  /* Pin every page in the buffer range. */
+  while ((char *) upage < (char *) buffer + size)
+    {
+      vm_unpin_frame (upage);
+      upage = (char *) upage + PGSIZE;
+    }
+}

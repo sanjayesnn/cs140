@@ -307,25 +307,12 @@ read (int fd, void *buffer, unsigned size)
       struct file_data *f = get_file_with_fd (fd);
       if (f == NULL) 
         return -1;
-      void *upage = pg_round_down (buffer);
-      /* Pin every page in the buffer range. */
-      while ((char *) upage < (char *) buffer + size)
-        {
-          vm_pin_frame (upage, true);
-          upage = (char *) upage + PGSIZE;
-        }
 
+      vm_pin_buffer_frames (buffer, size); 
       acquire_fs_lock ();
       int result = file_read (f->file_ptr, buffer, size); 
       release_fs_lock ();
-
-      upage = pg_round_down (buffer);
-      /* Unpin every page in the buffer range. */
-      while ((char *) upage < (char *) buffer + size)
-        {
-          vm_unpin_frame (upage);
-          upage = (char *) upage + PGSIZE;
-        }
+      vm_unpin_buffer_frames (buffer, size); 
 
       return result;
     }
@@ -367,25 +354,11 @@ write (int fd, const void *buffer, unsigned size)
       if (f == NULL) 
         return 0; 
 
-      void *upage = pg_round_down (buffer);
-      /* Pin every page in the buffer range. */
-      while ((char *) upage < (char *) buffer + size)
-        {
-          vm_pin_frame (upage, true);
-          upage = (char *) upage + PGSIZE;
-        }
-
+      vm_pin_buffer_frames (buffer, size);
       acquire_fs_lock ();
       int result = file_write (f->file_ptr, buffer, size);
       release_fs_lock ();
-
-      upage = pg_round_down (buffer);
-      /* Unpin every page in the buffer range. */
-      while ((char *) upage < (char *) buffer + size)
-        {
-          vm_unpin_frame (upage);
-          upage = (char *) upage + PGSIZE;
-        }
+      vm_unpin_buffer_frames (buffer, size);
 
       return result;
     }
