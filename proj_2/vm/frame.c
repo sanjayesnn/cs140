@@ -71,6 +71,7 @@ void
 ft_evict_page (void) 
 {
   ASSERT (clock_hand);
+  lock_acquire (&frame_table_lock);
   while (true) 
   {
     /* Check if frame pointed to by clock hand is pinned. */
@@ -92,6 +93,7 @@ ft_evict_page (void)
         // Evicting the page at clock hand
         void *kpage = clock_hand->kpage;
         struct spt_elem *spte = clock_hand->page_data;
+
         lock_acquire (&spte->spt_elem_lock);
 
         if (!pagedir_is_dirty (pd, upage))
@@ -117,6 +119,7 @@ ft_evict_page (void)
         increment_clock_hand ();
         list_remove (&clock_hand_cp->elem);
         free (clock_hand_cp);
+        lock_release (&frame_table_lock);
         return;
       }
 
