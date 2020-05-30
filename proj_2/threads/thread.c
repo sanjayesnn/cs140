@@ -307,7 +307,8 @@ thread_exit (void)
   lock_acquire (&cur->self_process_lock);
   if (cur->self_process != NULL)
     {
-      /* Set self_thread to be null, to prevent parent referencing freed data. */
+      /* Set self_thread to be null, 
+       * to prevent parent referencing freed data. */
       cur->self_process->self_thread = NULL;
       
       /* Let parent know that child has  finished */

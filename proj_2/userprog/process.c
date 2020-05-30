@@ -35,7 +35,7 @@ get_process_by_tid (tid_t tid) {
       e != list_end (&thread_current ()->child_processes);
       e = list_next (e))
     {
-      struct process *child_process = list_entry (e, struct process, elem);      
+      struct process *child_process = list_entry (e, struct process, elem); 
       if (child_process->pid == tid)
       {
         child = child_process;
@@ -134,7 +134,7 @@ process_wait (tid_t child_tid)
   sema_down (&child->exit_sema);
 
   int status = child->exit_status;
-  // Removes this child process from the child list and frees its struct
+  /* Removes this child process from the child list and frees its struct */
   list_remove (&child->elem);
   free (child);
 
@@ -569,7 +569,8 @@ setup_stack (void **esp)
   uint8_t *kpage;
   bool success = false;
 
-  kpage = vm_get_frame (PAL_USER | PAL_ZERO, ((uint8_t *) PHYS_BASE) - PGSIZE, true);
+  kpage = vm_get_frame (PAL_USER | PAL_ZERO, 
+                        ((uint8_t *) PHYS_BASE) - PGSIZE, true);
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);

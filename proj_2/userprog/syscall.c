@@ -29,7 +29,8 @@ typedef int mapid_t;
 
 static void syscall_handler (struct intr_frame *);
 static bool is_valid_string_memory (const void *vaddr);
-static bool is_valid_memory_range (const void *vaddr, size_t size, bool is_writable);
+static bool is_valid_memory_range (const void *vaddr, 
+                                   size_t size, bool is_writable);
 struct file_data *get_file_with_fd (int fd);
 struct mmap_file *get_mmap_file_with_mapping (mapid_t mapping);
 static void *get_nth_syscall_arg (void *esp, int n);
@@ -345,14 +346,16 @@ write (int fd, const void *buffer, unsigned size)
           void *start_page = pg_round_down (start);
           void *next_page = pg_round_up (start);
           ASSERT (start_page != next_page);
-          if ((void *) ((char *) start + (MAX_PUT_SIZE < size - ofs) ? MAX_PUT_SIZE : (size - ofs)) >= next_page)
+          if ((void *) ((char *) start + (MAX_PUT_SIZE < size - ofs) 
+                      ? MAX_PUT_SIZE : (size - ofs)) >= next_page)
             vm_pin_frame (next_page, true);
           vm_pin_frame (start_page, true);
           
           putbuf (start,
                   (MAX_PUT_SIZE < size - ofs) ? MAX_PUT_SIZE : size - ofs);
           
-          if ((void *) ((char *) start + (MAX_PUT_SIZE < size - ofs) ? MAX_PUT_SIZE : (size - ofs)) >= next_page) 
+          if ((void *) ((char *) start + (MAX_PUT_SIZE < size - ofs) 
+                      ? MAX_PUT_SIZE : (size - ofs)) >= next_page) 
             vm_unpin_frame (next_page);
           vm_unpin_frame (start_page);
         }
@@ -430,8 +433,6 @@ close (int fd)
 mapid_t
 mmap (int fd, void *addr)
 {
-  // printf("Inside of mmap, addr = %p\n", addr);
-  // TODO: figure out how to validate memory
   if (addr == 0x0 || pg_ofs (addr) != 0)
     return -1;
 
