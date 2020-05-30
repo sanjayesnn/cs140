@@ -111,6 +111,7 @@ vm_free_page (struct spt_elem *spte)
       if (spte->file != NULL && 
           kpage != NULL && 
           spte->writable && 
+          is_file_writable (spte->file) &&
           pagedir_is_dirty (cur->pagedir, upage))
         {
           off_t write_size = PGSIZE - spte->zero_bytes;

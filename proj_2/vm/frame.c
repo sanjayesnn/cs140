@@ -105,9 +105,20 @@ ft_evict_page (void)
           {
             /* Not accessed, is dirty */
             // TODO: make sure that the data is not being accessed right now
-            block_sector_t new_swap_sector = swap_write (kpage);
-            spte->swap_sector = new_swap_sector;
-            spte->status = IN_SWAP;
+            if (spte->file != NULL && 
+                kpage != NULL && 
+                spte->writable && 
+                is_file_writable (spte->file))
+              {
+                off_t write_size = PGSIZE - spte->zero_bytes;
+                file_write_at (spte->file, kpage, write_size, spte->ofs);
+              }
+            else
+              {
+                block_sector_t new_swap_sector = swap_write (kpage);
+                spte->swap_sector = new_swap_sector;
+                spte->status = IN_SWAP;
+              }
           }
 
         lock_release (&spte->spt_elem_lock);
