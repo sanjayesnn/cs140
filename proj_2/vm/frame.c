@@ -70,7 +70,6 @@ void
 ft_evict_page (void) 
 {
   ASSERT (clock_hand);
-  lock_acquire (&frame_table_lock);
   while (true) 
   {
     /* Check if frame pointed to by clock hand is pinned. */
@@ -128,7 +127,6 @@ ft_evict_page (void)
         increment_clock_hand ();
         list_remove (&clock_hand_cp->elem);
         free (clock_hand_cp);
-        lock_release (&frame_table_lock);
         return;
       }
 
@@ -216,8 +214,10 @@ vm_get_frame (enum palloc_flags flags, void *upage, bool writable)
   void *kpage = palloc_get_page (flags);
   if (kpage == NULL)
     {
+      lock_acquire (&frame_table_lock);
       ft_evict_page ();
       kpage = palloc_get_page (flags);
+      lock_release (&frame_table_lock);
       if (kpage == NULL)
           return NULL;
     }
