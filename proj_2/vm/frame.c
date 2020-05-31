@@ -148,6 +148,7 @@ vm_page_in (void *upage)
   }
   ASSERT (page->status != IN_MEMORY);
 
+  lock_acquire (&page->spt_elem_lock);
   /* Gets an empty frame */
   void *kpage = vm_get_frame (PAL_USER, upage, page->writable);
 
@@ -157,7 +158,7 @@ vm_page_in (void *upage)
       block_sector_t start_sector = page->swap_sector;
       bool was_pinned = page->is_pinned;
       if (!page->is_pinned)
-        vm_pin_frame (upage, false);
+        vm_pin_frame (upage, false, false);
       swap_read (kpage, start_sector);
       if (!was_pinned)
         vm_unpin_frame (upage);
@@ -186,8 +187,7 @@ vm_page_in (void *upage)
   if (page->status == IN_SWAP)
     pagedir_set_dirty (t->pagedir, upage, true);
 
-  /* Does bookkeeping */ 
-  lock_acquire (&page->spt_elem_lock);
+  /* Does bookkeeping */
   page->status = IN_MEMORY;
   lock_release (&page->spt_elem_lock);
 
@@ -282,16 +282,18 @@ vm_free_frame (void *kpage)
 }
 
 void
-vm_pin_frame (void *upage, bool page_in)
+vm_pin_frame (void *upage, bool page_in, bool acquire_lock)
 {
   struct hash *spt = &thread_current ()->spt;
   struct spt_elem *page = spt_get_page (spt, upage);
   ASSERT (page != NULL);
   ASSERT (!page->is_pinned);
-  lock_acquire (&page->spt_elem_lock);
+  if (acquire_lock)
+    lock_acquire (&page->spt_elem_lock);
   page->is_pinned = true;
   bool not_in_memory = (page->status != IN_MEMORY);
-  lock_release (&page->spt_elem_lock);
+  if (acquire_lock)
+    lock_release (&page->spt_elem_lock);
   if (not_in_memory && page_in)
     vm_page_in (upage);
 }
@@ -316,7 +318,7 @@ vm_pin_buffer_frames (const void *buffer, int size)
   /* Pin every page in the buffer range. */
   while ((char *) upage < (char *) buffer + size)
     {
-      vm_pin_frame (upage, true);
+      vm_pin_frame (upage, true, true);
       upage = (char *) upage + PGSIZE;
     }
 }

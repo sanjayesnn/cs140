@@ -345,8 +345,8 @@ write (int fd, const void *buffer, unsigned size)
           ASSERT (start_page != next_page);
           if ((void *) ((char *) start + (MAX_PUT_SIZE < size - ofs) 
                       ? MAX_PUT_SIZE : (size - ofs)) >= next_page)
-            vm_pin_frame (next_page, true);
-          vm_pin_frame (start_page, true);
+            vm_pin_frame (next_page, true, true);
+          vm_pin_frame (start_page, true, true);
           
           putbuf (start,
                   (MAX_PUT_SIZE < size - ofs) ? MAX_PUT_SIZE : size - ofs);
