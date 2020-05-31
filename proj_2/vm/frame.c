@@ -237,6 +237,8 @@ vm_get_frame (enum palloc_flags flags, void *upage, bool writable)
 
   struct frame_table_elem *new_entry = 
         malloc (sizeof (struct frame_table_elem));
+  if (new_entry == NULL)
+    PANIC ("Unable to alloc memory using malloc.");
   new_entry->holder = cur;
   new_entry->page_data = spt_get_page (&cur->spt, upage);
   new_entry->kpage = kpage;

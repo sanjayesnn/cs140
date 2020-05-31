@@ -264,6 +264,8 @@ open (const char *file)
     return -1;
   
   struct file_data *fdata = malloc (sizeof (struct file_data));
+  if (fdata == NULL)
+    PANIC ("Unable to alloc memory using malloc.");
   fdata->file_ptr = f;
 
   /* Determine the file descriptor number. */
@@ -445,6 +447,8 @@ mmap (int fd, void *addr)
     return -1;
 
   struct mmap_file *mf = malloc (sizeof (struct mmap_file));
+  if (mf == NULL)
+    PANIC ("Unable to alloc memory using malloc.");
   if (mf == NULL)
     return -1;
 

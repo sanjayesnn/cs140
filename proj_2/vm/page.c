@@ -51,6 +51,8 @@ void
 spt_add_page (struct hash *spt, void *upage, bool writable, bool lazy)
 {
   struct spt_elem *entry = malloc (sizeof (struct spt_elem));
+  if (entry == NULL)
+    PANIC ("Unable to alloc memory using malloc.");
   entry->status = lazy ? IN_FILESYS : IN_MEMORY;
   lock_init (&entry->spt_elem_lock);
   entry->upage = upage;

@@ -200,6 +200,8 @@ thread_create (const char *name, int priority,
   sf->ebp = 0;
 #ifdef USERPROG
   t->self_process = malloc (sizeof(struct process));
+  if (t->self_process == NULL)
+    PANIC ("Unable to alloc memory using malloc.");
   t->self_process->pid = tid;
   t->self_process->exit_status = -1;
   t->self_process->loaded = false;
