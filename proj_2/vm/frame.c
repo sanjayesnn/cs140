@@ -3,6 +3,7 @@
 #include <list.h>
 #include <stdio.h>
 #include <string.h>
+#include "filesys/filesys.h"
 #include "threads/malloc.h"
 #include "threads/palloc.h"
 #include "threads/synch.h"
@@ -168,6 +169,7 @@ vm_page_in (void *upage)
       size_t page_zero_bytes = page->zero_bytes;
       size_t page_read_bytes = PGSIZE - page_zero_bytes;
       struct file* file = page->file;
+      acquire_fs_lock ();
       if (file_read_at (
                   file, 
                   kpage, 
@@ -175,8 +177,10 @@ vm_page_in (void *upage)
                   page->ofs) != (int) page_read_bytes)
         {
           vm_free_frame (kpage);
+          release_fs_lock ();
           return false;
         }
+      release_fs_lock ();
       memset (kpage + page_read_bytes, 0, page_zero_bytes); 
     }
 
