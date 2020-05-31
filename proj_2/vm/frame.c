@@ -146,7 +146,7 @@ vm_page_in (void *upage)
   if (page == NULL) {
      return false;
   }
-  ASSERT (page->status != IN_MEMORY); // TODO
+  ASSERT (page->status != IN_MEMORY);
 
   /* Gets an empty frame */
   void *kpage = vm_get_frame (PAL_USER, upage, page->writable);
@@ -183,6 +183,8 @@ vm_page_in (void *upage)
   /* Adds a mapping from upage to kpage */
   struct thread *t = thread_current ();
   pagedir_set_page (t->pagedir, upage, kpage, page->writable);
+  if (page->status == IN_SWAP)
+    pagedir_set_dirty (t->pagedir, upage, true);
 
   /* Does bookkeeping */ 
   lock_acquire (&page->spt_elem_lock);
